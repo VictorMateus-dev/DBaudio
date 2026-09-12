@@ -42,20 +42,25 @@ export const NoiseChart: React.FC<NoiseChartProps> = ({
   ];
 
   return (
-    <div className="w-full bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
+    <div className="vault-card rounded-3xl p-6 shadow-glass-card">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
-          <h3 className="text-sm font-semibold text-white">Curva de Intensidade Sonora</h3>
-          <p className="text-xs text-slate-400">Telemetria contínua em dB SPL ponderado A</p>
+          <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+            <span>Curva de Intensidade Sonora</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-mono">
+              dB SPL Ponderado A
+            </span>
+          </h3>
+          <p className="text-xs text-slate-400">Telemetria em tempo real com jitter acústico natural</p>
         </div>
         <div className="flex items-center space-x-4 text-xs">
           <div className="flex items-center space-x-1.5">
-            <span className="w-3 h-0.5 bg-amber-500"></span>
-            <span className="text-slate-400">Limite Diurno ({warningThreshold} dB)</span>
+            <span className="w-3 h-0.5 bg-amber-400"></span>
+            <span className="text-slate-400 text-[11px]">Aviso ({warningThreshold} dB)</span>
           </div>
           <div className="flex items-center space-x-1.5">
             <span className="w-3 h-0.5 bg-red-500"></span>
-            <span className="text-slate-400">Crítico ({criticalThreshold} dB)</span>
+            <span className="text-slate-400 text-[11px]">Crítico ({criticalThreshold} dB)</span>
           </div>
         </div>
       </div>
@@ -64,9 +69,10 @@ export const NoiseChart: React.FC<NoiseChartProps> = ({
         <ResponsiveContainer>
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>
-              <linearGradient id="noiseGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+              <linearGradient id="vaultNoiseGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.45} />
+                <stop offset="60%" stopColor="#6366f1" stopOpacity={0.15} />
+                <stop offset="100%" stopColor="#06060c" stopOpacity={0.0} />
               </linearGradient>
             </defs>
             <XAxis 
@@ -74,46 +80,47 @@ export const NoiseChart: React.FC<NoiseChartProps> = ({
               stroke="#64748b" 
               fontSize={11} 
               tickLine={false} 
-              axisLine={{ stroke: '#334155' }} 
+              axisLine={{ stroke: 'rgba(255, 255, 255, 0.08)' }} 
             />
             <YAxis 
               domain={[30, 100]} 
               stroke="#64748b" 
               fontSize={11} 
               tickLine={false} 
-              axisLine={{ stroke: '#334155' }}
+              axisLine={{ stroke: 'rgba(255, 255, 255, 0.08)' }}
               tickFormatter={(v) => `${v}dB`}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: '#0f172a',
-                borderColor: '#1e293b',
-                borderRadius: '8px',
+                backgroundColor: '#0a0b16',
+                borderColor: 'rgba(139, 92, 246, 0.4)',
+                borderRadius: '16px',
                 fontSize: '12px',
                 color: '#f8fafc',
+                boxShadow: '0 0 25px rgba(139, 92, 246, 0.25)',
               }}
-              formatter={(value: any) => [`${value} dB`, 'Nível de Ruído']}
+              formatter={(value: any) => [`${value} dB`, 'Nível Acústico']}
               labelFormatter={(label) => `Horário: ${label}`}
             />
             <ReferenceLine 
               y={warningThreshold} 
               stroke="#f59e0b" 
-              strokeDasharray="3 3" 
+              strokeDasharray="4 4" 
               strokeWidth={1.5}
             />
             <ReferenceLine 
               y={criticalThreshold} 
               stroke="#ef4444" 
-              strokeDasharray="3 3" 
+              strokeDasharray="4 4" 
               strokeWidth={1.5}
             />
             <Area
               type="monotone"
               dataKey="decibel"
-              stroke="#3b82f6"
-              strokeWidth={2}
+              stroke="#a855f7"
+              strokeWidth={2.5}
               fillOpacity={1}
-              fill="url(#noiseGradient)"
+              fill="url(#vaultNoiseGradient)"
             />
           </AreaChart>
         </ResponsiveContainer>

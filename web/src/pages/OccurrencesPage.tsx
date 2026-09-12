@@ -70,7 +70,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
       id: `occ-${Date.now()}`,
       condominium_id: user?.condominium_id || 'c1',
       reporter_id: isAnonymous ? undefined : user?.id,
-      apartment_id: user?.apartment_id,
+      apartment_id: user?.apartment_id || undefined,
       type: newType,
       location: newLocation,
       description: newDescription.trim(),

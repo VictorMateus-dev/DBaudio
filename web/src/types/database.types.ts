@@ -30,6 +30,9 @@ export interface Apartment {
   status?: 'normal' | 'warning' | 'critical' | 'offline';
   peak_db?: number;
   avg_db?: number;
+  custom_day_threshold_db?: number;
+  custom_night_threshold_db?: number;
+  custom_critical_threshold_db?: number;
 }
 
 export interface Profile {
@@ -39,7 +42,8 @@ export interface Profile {
   phone?: string;
   role: Role;
   condominium_id: string;
-  apartment_id?: string;
+  apartment_id?: string | null;
+  apartment_number?: string;
   created_at: string;
   updated_at: string;
 }
@@ -133,7 +137,7 @@ export interface Occurrence {
   id: string;
   condominium_id: string;
   reporter_id?: string;
-  apartment_id?: string;
+  apartment_id?: string | null;
   type: string;
   location: string;
   description: string;
@@ -153,4 +157,34 @@ export interface OccurrenceComment {
   comment: string;
   created_at: string;
   author_name?: string;
+}
+
+export interface UserHistoryReport {
+  profile: Profile;
+  apartment?: Apartment | null;
+  alerts: Alert[];
+  occurrences: Occurrence[];
+  recentReadings: NoiseReading[];
+  stats: {
+    totalAlerts: number;
+    totalOccurrences: number;
+    peakDbRecorded: number;
+    daysActive: number;
+  };
+}
+
+export interface CreateApartmentDTO {
+  number: string;
+  floor?: number;
+  building_id?: string;
+  custom_day_threshold_db?: number;
+  custom_night_threshold_db?: number;
+  custom_critical_threshold_db?: number;
+}
+
+export interface UpdateApartmentThresholdsDTO {
+  apartmentId: string;
+  custom_day_threshold_db?: number | null;
+  custom_night_threshold_db?: number | null;
+  custom_critical_threshold_db?: number | null;
 }

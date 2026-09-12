@@ -7,6 +7,7 @@ import { ApartmentDetailPage } from './pages/ApartmentDetailPage';
 import { OccurrencesPage } from './pages/OccurrencesPage';
 import { DevicesPage } from './pages/DevicesPage';
 import { PoliciesPage } from './pages/PoliciesPage';
+import { ResidentsManagementPage } from './pages/ResidentsManagementPage';
 import { SimulatorLabPage } from './pages/SimulatorLabPage';
 import { ResidentMobileView } from './pages/ResidentMobileView';
 import { LoginPage } from './pages/LoginPage';
@@ -61,17 +62,9 @@ export const App: React.FC = () => {
 
   // Se o perfil selecionado for Morador, renderiza o App Morador (Mobile View)
   if (role === 'resident') {
-    const residentApt = apartments.find(a => a.id === user.apartment_id || a.number === '101') || apartments[0] || {
-      id: '10100000-0000-0000-0000-000000000101',
-      building_id: 'b1',
-      number: '101',
-      floor: 1,
-      current_db: 48.0,
-      status: 'normal',
-      peak_db: 68.2,
-      avg_db: 46.5,
-      created_at: new Date().toISOString()
-    };
+    const residentApt = user?.apartment_id
+      ? apartments.find(a => a.id === user.apartment_id) || null
+      : null;
 
     return (
       <ResidentMobileView
@@ -93,8 +86,10 @@ export const App: React.FC = () => {
     setCurrentTab('simulator');
   };
 
+  const pendingResidentsCount = localStore.profiles.filter(p => p.role === 'resident' && !p.apartment_id).length;
+
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-space-950 text-slate-100 overflow-hidden">
       {/* Fixed Left Sidebar */}
       <Sidebar
         currentTab={currentTab}
@@ -104,6 +99,7 @@ export const App: React.FC = () => {
         }}
         openAlertsCount={alerts.filter(a => !a.read).length}
         openOccurrencesCount={occurrences.filter(o => o.status === 'aberta').length}
+        pendingResidentsCount={pendingResidentsCount}
       />
 
       {/* Main Content Area */}
@@ -149,6 +145,12 @@ export const App: React.FC = () => {
                   onSelectApartment={handleSelectApartment}
                   onRefresh={loadAllData}
                 />
+              )}
+
+              {currentTab === 'residents' && (
+                <div className="p-8">
+                  <ResidentsManagementPage />
+                </div>
               )}
 
               {currentTab === 'occurrences' && (

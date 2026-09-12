@@ -7,18 +7,20 @@ import {
   Sliders, 
   FlaskConical, 
   Volume2, 
-  ShieldCheck, 
-  UserCircle 
+  Users,
+  LogOut,
+  UserCheck
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-export type NavTab = 'overview' | 'floorplan' | 'occurrences' | 'devices' | 'policies' | 'simulator';
+export type NavTab = 'overview' | 'floorplan' | 'residents' | 'occurrences' | 'devices' | 'policies' | 'simulator';
 
 interface SidebarProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   openAlertsCount: number;
   openOccurrencesCount: number;
+  pendingResidentsCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -26,37 +28,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   openAlertsCount,
   openOccurrencesCount,
+  pendingResidentsCount = 0,
 }) => {
-  const { role, switchRole, user } = useAuth();
+  const { role, switchRole, user, logout } = useAuth();
 
   const navItems = [
     { id: 'overview' as NavTab, label: 'Painel Geral', icon: LayoutDashboard },
     { id: 'floorplan' as NavTab, label: 'Planta das Unidades', icon: Grid3X3 },
-    { id: 'occurrences' as NavTab, label: 'Ocorrências', icon: AlertTriangle, badge: openOccurrencesCount },
+    { id: 'residents' as NavTab, label: 'Moradores & Unidades', icon: Users, badge: pendingResidentsCount, badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+    { id: 'occurrences' as NavTab, label: 'Ocorrências', icon: AlertTriangle, badge: openOccurrencesCount, badgeColor: 'bg-red-500/20 text-red-300 border-red-500/30' },
     { id: 'devices' as NavTab, label: 'Dispositivos ESP32', icon: Cpu },
     { id: 'policies' as NavTab, label: 'Políticas de Ruído', icon: Sliders },
     { id: 'simulator' as NavTab, label: 'Laboratório & Testes', icon: FlaskConical, highlight: true },
   ];
 
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between h-screen sticky top-0">
+    <aside className="w-64 bg-space-900/95 backdrop-blur-xl border-r border-white/5 flex flex-col justify-between h-screen sticky top-0 z-30">
       <div>
-        {/* Logo & Brand */}
-        <div className="p-6 border-b border-slate-800 flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+        {/* Vaultflow Logo & Brand */}
+        <div className="p-6 border-b border-white/5 flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-white shadow-glow-purple">
             <Volume2 className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="font-bold text-lg tracking-tight text-white flex items-center gap-1.5">
+            <h1 className="font-extrabold text-base tracking-tight text-white flex items-center gap-1.5">
               dBSound
-              <span className="text-[10px] uppercase font-bold tracking-widest bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Pro</span>
+              <span className="text-[9px] uppercase font-bold tracking-widest bg-violet-500/20 text-violet-300 border border-violet-500/30 px-1.5 py-0.5 rounded-full">
+                SaaS
+              </span>
             </h1>
-            <p className="text-xs text-slate-400">Monitoramento Inteligente</p>
+            <p className="text-[11px] text-slate-400">Acoustic Intelligence</p>
           </div>
         </div>
 
         {/* Navigation Items */}
-        <nav className="p-4 space-y-1.5">
+        <nav className="p-3.5 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
@@ -64,12 +70,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => onSelectTab(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                    ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-glow-purple'
                     : item.highlight
-                    ? 'text-amber-400 hover:bg-amber-500/10 border border-amber-500/20'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    ? 'text-amber-300 hover:bg-amber-500/10 border border-amber-500/20'
+                    : 'text-slate-400 hover:bg-white/[0.04] hover:text-white'
                 }`}
               >
                 <div className="flex items-center space-x-3">
@@ -77,9 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span>{item.label}</span>
                 </div>
                 {item.badge !== undefined && item.badge > 0 && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-red-500/20 text-red-400'
-                  }`}>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${item.badgeColor || 'bg-violet-500/20 text-violet-300'}`}>
                     {item.badge}
                   </span>
                 )}
@@ -90,32 +94,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Footer / User Profile & Role Switcher */}
-      <div className="p-4 border-t border-slate-800 bg-slate-900/50">
-        <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50 mb-3">
-          <div className="flex items-center space-x-3 mb-2">
-            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-300">
-              <UserCircle className="w-5 h-5" />
+      <div className="p-4 border-t border-white/5 bg-space-950/60">
+        <div className="vault-card rounded-2xl p-3 border-white/10 mb-3 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2.5 overflow-hidden">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-glow-purple shrink-0">
+                {user?.full_name ? user.full_name.slice(0, 2).toUpperCase() : 'DB'}
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-xs font-semibold text-white truncate">{user?.full_name || 'Usuário'}</p>
+                <p className="text-[10px] text-slate-400 truncate">
+                  {role === 'admin' ? 'Síndico Geral' : user?.apartment_number ? `Apto ${user.apartment_number}` : 'Pendente'}
+                </p>
+              </div>
             </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-semibold text-white truncate">{user?.full_name}</p>
-              <p className="text-[11px] text-slate-400 capitalize">{role === 'admin' ? 'Síndico / Admin' : 'Morador Apto 101'}</p>
-            </div>
+
+            <button
+              onClick={() => logout()}
+              title="Sair da Conta"
+              className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-red-400 transition"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
-          
-          {/* Quick Role Toggle for testing RLS & views */}
-          <div className="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-lg text-[11px]">
+
+          {/* Quick Role Toggle */}
+          <div className="grid grid-cols-2 gap-1 bg-space-900 p-1 rounded-xl text-[10px]">
             <button
               onClick={() => switchRole('admin')}
-              className={`py-1 rounded font-medium transition ${
-                role === 'admin' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+              className={`py-1 rounded-lg font-semibold transition ${
+                role === 'admin' ? 'bg-violet-600 text-white shadow-glow-purple' : 'text-slate-400 hover:text-white'
               }`}
             >
               Síndico
             </button>
             <button
               onClick={() => switchRole('resident')}
-              className={`py-1 rounded font-medium transition ${
-                role === 'resident' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+              className={`py-1 rounded-lg font-semibold transition ${
+                role === 'resident' ? 'bg-violet-600 text-white shadow-glow-purple' : 'text-slate-400 hover:text-white'
               }`}
             >
               Morador
@@ -123,12 +139,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+        <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Telemetria Ativa</span>
+            <span className="text-slate-400 text-[10px]">Telemetria Nuvem</span>
           </div>
-          <span className="font-mono text-[10px] text-slate-400">v1.2.0</span>
+          <span className="font-mono text-[10px] text-slate-500">v2.0</span>
         </div>
       </div>
     </aside>

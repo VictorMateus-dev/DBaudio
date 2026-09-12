@@ -12,14 +12,17 @@ import {
   ChevronRight,
   Wifi,
   Smartphone,
-  Info
+  Info,
+  Building2,
+  Clock,
+  Sparkles
 } from 'lucide-react';
 import { Apartment, Alert, Occurrence } from '../types/database.types';
 import { DataService, localStore } from '../lib/dataService';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ResidentMobileViewProps {
-  apartment: Apartment;
+  apartment?: Apartment | null;
   alerts: Alert[];
   occurrences: Occurrence[];
   onRefresh: () => void;
@@ -31,7 +34,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   occurrences,
   onRefresh,
 }) => {
-  const { user, switchRole } = useAuth();
+  const { user, switchRole, refreshProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'occurrences' | 'profile' | 'privacy'>('home');
   const [activeModalAlert, setActiveModalAlert] = useState<Alert | null>(null);
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
@@ -52,8 +55,8 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
     }
   }, [alerts]);
 
-  const currentDb = apartment.current_db || 48.0;
-  const status = apartment.status || 'normal';
+  const currentDb = apartment?.current_db || 48.0;
+  const status = apartment?.status || 'normal';
 
   const handleDismissAlert = () => {
     if (activeModalAlert) {
@@ -72,7 +75,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
       id: `occ-${Date.now()}`,
       condominium_id: user?.condominium_id || 'c1',
       reporter_id: isAnonymous ? undefined : user?.id,
-      apartment_id: apartment.id,
+      apartment_id: apartment?.id,
       type: newType,
       location: newLocation,
       description: newDesc.trim(),
@@ -95,13 +98,88 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
     }, 1500);
   };
 
+  // TELA DE ESPERA: Quando o morador confirmou e-mail mas ainda não foi alocado a um apartamento
+  if (!apartment || !user?.apartment_id) {
+    return (
+      <div className="min-h-screen bg-space-950 p-4 md:p-8 flex flex-col items-center justify-center relative overflow-hidden">
+        {/* Atmospheric Glow */}
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[500px] bg-violet-600/15 blur-[120px] pointer-events-none" />
+
+        {/* Top Banner with Role Switcher */}
+        <div className="w-full max-w-md mb-4 flex items-center justify-between text-xs text-slate-400 px-2 relative z-10">
+          <div className="flex items-center space-x-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+            <span className="text-white font-medium">App Morador (Aguardando Alocação)</span>
+          </div>
+          <button
+            onClick={() => switchRole('admin')}
+            className="px-3.5 py-1.5 rounded-full bg-violet-600 text-white font-semibold text-xs shadow-glow-purple hover:bg-violet-500 transition"
+          >
+            Painel Síndico
+          </button>
+        </div>
+
+        {/* Pending Card in Vaultflow Style */}
+        <div className="w-full max-w-md vault-card rounded-3xl p-8 text-center space-y-6 shadow-glass-card relative z-10 animate-fadeIn">
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-500/20 to-violet-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto shadow-glow-purple">
+            <Building2 className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-semibold">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Status: Aguardando Alocação</span>
+            </div>
+            <h2 className="text-xl font-extrabold text-white">Olá, {user?.full_name || 'Novo Morador'}!</h2>
+            <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
+              Sua conta foi criada e verificada no Supabase. O síndico do condomínio foi notificado e fará a vinculação da sua unidade residencial em breve.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-space-900/90 border border-white/5 text-left text-xs space-y-2.5">
+            <div className="font-semibold text-white flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-violet-400" />
+              <span>Como funciona a ativação:</span>
+            </div>
+            <div className="space-y-2 text-slate-400 text-[11px]">
+              <div className="flex items-start gap-2">
+                <span className="w-4 h-4 rounded-full bg-violet-500/20 text-violet-300 flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
+                <span>O síndico acessa a aba "Moradores" e vincula seu cadastro à sua unidade.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="w-4 h-4 rounded-full bg-violet-500/20 text-violet-300 flex items-center justify-center text-[10px] font-bold shrink-0">2</span>
+                <span>O medidor em decibéis (dB SPL), histórico e ocorrências abrem automaticamente aqui.</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2 pt-1">
+            <button
+              onClick={() => { refreshProfile(); onRefresh(); }}
+              className="w-full py-3.5 rounded-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold text-xs shadow-glow-purple transition flex items-center justify-center gap-2"
+            >
+              <Clock className="w-4 h-4" />
+              <span>Verificar se Já Fui Alocado</span>
+            </button>
+            <button
+              onClick={() => switchRole('admin')}
+              className="w-full py-2.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 text-xs font-medium transition"
+            >
+              Alternar para Síndico (Demonstração)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-950 p-4 md:p-8 flex flex-col items-center justify-center">
+    <div className="min-h-screen bg-space-950 p-4 md:p-8 flex flex-col items-center justify-center">
       {/* Top Banner with View Switcher */}
       <div className="w-full max-w-md mb-4 flex items-center justify-between text-xs text-slate-400 px-2">
         <div className="flex items-center space-x-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="text-white font-medium">App Morador (Visão do Celular)</span>
+          <span className="text-white font-medium">App Morador (Apto {apartment.number})</span>
         </div>
 
         <div className="flex items-center space-x-2">

@@ -13,19 +13,20 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
   onSelectApartment,
   selectedApartmentId,
 }) => {
-  // Organizar apartamentos por andar (3º andar, 2º andar, 1º andar)
-  const floors = [3, 2, 1];
+  // Organizar andares dinamicamente com base nos apartamentos cadastrados
+  const detectedFloors = Array.from(new Set(apartments.map(a => a.floor || 1))).sort((a, b) => b - a);
+  const floors = detectedFloors.length > 0 ? detectedFloors : [1];
 
   const getStatusBorder = (status?: string) => {
     switch (status) {
       case 'critical':
-        return 'border-red-500 bg-red-950/20 shadow-lg shadow-red-500/10 critical-pulse';
+        return 'border-red-500 bg-red-950/20 shadow-glow-purple critical-pulse';
       case 'warning':
         return 'border-amber-500/80 bg-amber-950/20';
       case 'offline':
-        return 'border-slate-800 bg-slate-900/40 opacity-70';
+        return 'border-white/5 bg-space-900/40 opacity-70';
       default:
-        return 'border-slate-800 bg-slate-900/80 hover:border-blue-500/50';
+        return 'vault-card hover:border-violet-500/40';
     }
   };
 
@@ -141,15 +142,23 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
                         )}
                       </div>
 
-                      {/* Action trigger */}
-                      <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
-                        <span className="flex items-center gap-1 text-[11px]">
-                          <Activity className="w-3.5 h-3.5 text-blue-400" />
-                          3 sensores ativos
-                        </span>
-                        <span className="flex items-center text-blue-400 font-medium group-hover:translate-x-0.5 transition">
-                          Ver detalhes <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
-                        </span>
+                      {/* Action trigger & Custom Limits */}
+                      <div className="pt-2.5 border-t border-white/5 space-y-1.5 text-xs text-slate-400">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="flex items-center gap-1 text-slate-400">
+                            <Activity className="w-3.5 h-3.5 text-violet-400" />
+                            <span>Limites:</span>
+                          </span>
+                          <span className="font-mono text-[10px] text-slate-300">
+                            ☀️ {apt.custom_day_threshold_db ?? 70} dB • 🌙 {apt.custom_night_threshold_db ?? 60} dB
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 text-[10px]">3 sensores calibrados</span>
+                          <span className="flex items-center text-violet-400 hover:text-violet-300 font-medium transition">
+                            Inspecionar <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );

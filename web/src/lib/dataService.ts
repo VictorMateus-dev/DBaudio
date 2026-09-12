@@ -1,18 +1,19 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { 
   Apartment, Device, Sensor, NoiseReading, 
-  NoiseEvent, Alert, Occurrence, OccurrenceComment, NoisePolicy, Profile 
+  NoiseEvent, Alert, Occurrence, OccurrenceComment, NoisePolicy, Profile,
+  UserHistoryReport, CreateApartmentDTO, UpdateApartmentThresholdsDTO
 } from '../types/database.types';
 
 // ============================================================================
-// DADOS DE DEMONSTRAÇÃO / BASELINE INICIAL (ESPELHO DO SEED.SQL)
+// DADOS DE DEMONSTRAÇÃO / BASELINE INICIAL
 // ============================================================================
 const initialApartments: Apartment[] = [
-  { id: '10100000-0000-0000-0000-000000000101', building_id: 'b1', number: '101', floor: 1, current_db: 45.2, status: 'normal', peak_db: 58.4, avg_db: 46.1, created_at: new Date().toISOString() },
-  { id: '10200000-0000-0000-0000-000000000102', building_id: 'b1', number: '102', floor: 1, current_db: 51.0, status: 'normal', peak_db: 62.0, avg_db: 49.3, created_at: new Date().toISOString() },
-  { id: '10300000-0000-0000-0000-000000000103', building_id: 'b1', number: '103', floor: 1, current_db: 74.5, status: 'warning', peak_db: 76.2, avg_db: 68.0, created_at: new Date().toISOString() },
+  { id: '10100000-0000-0000-0000-000000000101', building_id: 'b1', number: '101', floor: 1, current_db: 45.2, status: 'normal', peak_db: 58.4, avg_db: 46.1, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80, created_at: new Date().toISOString() },
+  { id: '10200000-0000-0000-0000-000000000102', building_id: 'b1', number: '102', floor: 1, current_db: 51.0, status: 'normal', peak_db: 62.0, avg_db: 49.3, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80, created_at: new Date().toISOString() },
+  { id: '10300000-0000-0000-0000-000000000103', building_id: 'b1', number: '103', floor: 1, current_db: 74.5, status: 'warning', peak_db: 76.2, avg_db: 68.0, custom_day_threshold_db: 68, custom_night_threshold_db: 58, custom_critical_threshold_db: 78, created_at: new Date().toISOString() },
   { id: '20100000-0000-0000-0000-000000000201', building_id: 'b1', number: '201', floor: 2, current_db: 42.1, status: 'normal', peak_db: 50.1, avg_db: 43.8, created_at: new Date().toISOString() },
-  { id: '20200000-0000-0000-0000-000000000202', building_id: 'b1', number: '202', floor: 2, current_db: 84.8, status: 'critical', peak_db: 89.2, avg_db: 78.4, created_at: new Date().toISOString() },
+  { id: '20200000-0000-0000-0000-000000000202', building_id: 'b1', number: '202', floor: 2, current_db: 84.8, status: 'critical', peak_db: 89.2, avg_db: 78.4, custom_day_threshold_db: 72, custom_night_threshold_db: 62, custom_critical_threshold_db: 82, created_at: new Date().toISOString() },
   { id: '20300000-0000-0000-0000-000000000203', building_id: 'b1', number: '203', floor: 2, current_db: 0, status: 'offline', peak_db: 54.0, avg_db: 45.0, created_at: new Date().toISOString() },
   { id: '30100000-0000-0000-0000-000000000301', building_id: 'b1', number: '301', floor: 3, current_db: 43.0, status: 'normal', peak_db: 52.0, avg_db: 44.5, created_at: new Date().toISOString() },
   { id: '30200000-0000-0000-0000-000000000302', building_id: 'b1', number: '302', floor: 3, current_db: 48.6, status: 'normal', peak_db: 56.1, avg_db: 47.2, created_at: new Date().toISOString() },
@@ -38,8 +39,57 @@ const initialSensors: Sensor[] = [
 ];
 
 const initialPolicies: NoisePolicy[] = [
-  { id: 'p1', condominium_id: 'c1', name: 'Política Diurna', start_time: '07:00', end_time: '22:00', threshold_db: 70.0, warning_threshold_db: 70.0, critical_threshold_db: 80.0, min_duration_seconds: 3, cooldown_seconds: 60, enabled: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 'p1', condominium_id: 'c1', name: 'Política Diurna Padrão', start_time: '07:00', end_time: '22:00', threshold_db: 70.0, warning_threshold_db: 70.0, critical_threshold_db: 80.0, min_duration_seconds: 3, cooldown_seconds: 60, enabled: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   { id: 'p2', condominium_id: 'c1', name: 'Política Noturna (Silêncio)', start_time: '22:00', end_time: '07:00', threshold_db: 60.0, warning_threshold_db: 60.0, critical_threshold_db: 70.0, min_duration_seconds: 3, cooldown_seconds: 60, enabled: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+];
+
+const initialProfiles: Profile[] = [
+  {
+    id: 'aaaa1111-0000-0000-0000-000000000001',
+    full_name: 'Carlos Síndico Geral',
+    email: 'admin@dbsound.com',
+    phone: '(11) 98888-0001',
+    role: 'admin',
+    condominium_id: 'c1',
+    apartment_id: null,
+    created_at: new Date(Date.now() - 3600000 * 24 * 120).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'bbbb2222-0000-0000-0000-000000000101',
+    full_name: 'João Silva',
+    email: 'morador101@dbsound.com',
+    phone: '(11) 97777-0101',
+    role: 'resident',
+    condominium_id: 'c1',
+    apartment_id: '10100000-0000-0000-0000-000000000101',
+    apartment_number: '101',
+    created_at: new Date(Date.now() - 3600000 * 24 * 45).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'cccc3333-0000-0000-0000-000000000202',
+    full_name: 'Mariana Oliveira',
+    email: 'morador202@dbsound.com',
+    phone: '(11) 96666-0202',
+    role: 'resident',
+    condominium_id: 'c1',
+    apartment_id: '20200000-0000-0000-0000-000000000202',
+    apartment_number: '202',
+    created_at: new Date(Date.now() - 3600000 * 24 * 20).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'dddd4444-0000-0000-0000-000000000999',
+    full_name: 'Lucas Ferreira (Aguardando Alocação)',
+    email: 'lucas.morador@email.com',
+    phone: '(11) 95555-9999',
+    role: 'resident',
+    condominium_id: 'c1',
+    apartment_id: null,
+    created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
+    updated_at: new Date().toISOString(),
+  }
 ];
 
 const initialAlerts: Alert[] = [
@@ -51,7 +101,7 @@ const initialOccurrences: Occurrence[] = [
   {
     id: 'occ1',
     condominium_id: 'c1',
-    reporter_id: 'u1',
+    reporter_id: 'bbbb2222-0000-0000-0000-000000000101',
     apartment_id: initialApartments[4].id,
     type: 'Música Alta e Batidas',
     location: 'Apartamento 202',
@@ -85,7 +135,7 @@ const initialOccurrences: Occurrence[] = [
 const initialComments: Record<string, OccurrenceComment[]> = {
   occ1: [
     { id: 'c1', occurrence_id: 'occ1', author_id: 'admin1', author_name: 'Carlos Síndico Geral', comment: 'Notificação orientativa enviada preventivamente ao morador do apartamento citado via painel.', created_at: new Date(Date.now() - 3600000 * 1.5).toISOString() },
-    { id: 'c2', occurrence_id: 'occ1', author_id: 'u1', author_name: 'João Silva', comment: 'Ruído cessou por volta das 23h45. Agradeço a rápida intervenção!', created_at: new Date(Date.now() - 3600000 * 0.5).toISOString() },
+    { id: 'c2', occurrence_id: 'occ1', author_id: 'bbbb2222-0000-0000-0000-000000000101', author_name: 'João Silva', comment: 'Ruído cessou por volta das 23h45. Agradeço a rápida intervenção!', created_at: new Date(Date.now() - 3600000 * 0.5).toISOString() },
   ]
 };
 
@@ -97,6 +147,7 @@ class LocalDataStore {
   devices = [...initialDevices];
   sensors = [...initialSensors];
   policies = [...initialPolicies];
+  profiles = [...initialProfiles];
   alerts = [...initialAlerts];
   occurrences = [...initialOccurrences];
   comments: Record<string, OccurrenceComment[]> = { ...initialComments };
@@ -114,7 +165,7 @@ class LocalDataStore {
     this.listeners.forEach(fn => fn());
   }
 
-  // Executa o exato pipeline unificado no store local
+  // Executa o exato pipeline unificado no store local respeitando limites customizados do apartamento
   processNoiseReading(reading: NoiseReading) {
     this.readings.unshift(reading);
     if (this.readings.length > 200) this.readings.pop();
@@ -125,22 +176,26 @@ class LocalDataStore {
       apt.peak_db = Math.max(apt.peak_db || 0, reading.decibel);
       apt.avg_db = Number((((apt.avg_db || 50) * 4 + reading.decibel) / 5).toFixed(1));
 
-      // Determinar política vigente (horário atual)
+      // Determinar política vigente e aplicar limites específicos do apartamento se existirem
       const now = new Date();
       const hour = now.getHours();
       const isNight = hour >= 22 || hour < 7;
-      const warningThreshold = isNight ? 60 : 70;
-      const criticalThreshold = isNight ? 70 : 80;
+      
+      const warningThreshold = isNight 
+        ? (apt.custom_night_threshold_db ?? 60.0) 
+        : (apt.custom_day_threshold_db ?? 70.0);
+      const criticalThreshold = isNight 
+        ? (apt.custom_critical_threshold_db ?? 70.0) 
+        : (apt.custom_critical_threshold_db ?? 80.0);
 
       if (reading.decibel >= criticalThreshold) {
         apt.status = 'critical';
-        // Gerar alerta crítico
         const newAlert: Alert = {
           id: `alt-${Date.now()}`,
           apartment_id: apt.id,
           type: 'high_noise',
           title: 'ALERTA!! RUÍDO CRÍTICO DETECTADO',
-          message: `Nível sonoro atingiu ${reading.decibel.toFixed(1)} dB no apartamento ${apt.number}.`,
+          message: `Nível sonoro atingiu ${reading.decibel.toFixed(1)} dB no apartamento ${apt.number} (limite: ${criticalThreshold} dB).`,
           severity: 'critical',
           read: false,
           created_at: new Date().toISOString(),
@@ -154,7 +209,7 @@ class LocalDataStore {
           apartment_id: apt.id,
           type: 'high_noise',
           title: 'Aviso: Nível de Ruído Elevado',
-          message: `Nível sonoro atingiu ${reading.decibel.toFixed(1)} dB no apartamento ${apt.number}.`,
+          message: `Nível sonoro atingiu ${reading.decibel.toFixed(1)} dB no apartamento ${apt.number} (limite: ${warningThreshold} dB).`,
           severity: 'warning',
           read: false,
           created_at: new Date().toISOString(),
@@ -176,7 +231,7 @@ export const localStore = new LocalDataStore();
 // DATA SERVICE API
 // ============================================================================
 export const DataService = {
-  // Apartamentos
+  // APARTAMENTOS
   async getApartments(): Promise<Apartment[]> {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('apartments').select('*').order('number');
@@ -193,7 +248,250 @@ export const DataService = {
     return localStore.apartments.find(a => a.id === id) || null;
   },
 
-  // Dispositivos
+  async createApartment(dto: CreateApartmentDTO): Promise<Apartment> {
+    const newApt: Apartment = {
+      id: `apt-${Date.now()}`,
+      building_id: dto.building_id || 'b1',
+      number: dto.number,
+      floor: dto.floor || 1,
+      current_db: 40.0,
+      status: 'normal',
+      peak_db: 40.0,
+      avg_db: 40.0,
+      custom_day_threshold_db: dto.custom_day_threshold_db ?? 70.0,
+      custom_night_threshold_db: dto.custom_night_threshold_db ?? 60.0,
+      custom_critical_threshold_db: dto.custom_critical_threshold_db ?? 80.0,
+      created_at: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('apartments').insert({
+        building_id: newApt.building_id,
+        number: newApt.number,
+        floor: newApt.floor,
+        custom_day_threshold_db: newApt.custom_day_threshold_db,
+        custom_night_threshold_db: newApt.custom_night_threshold_db,
+        custom_critical_threshold_db: newApt.custom_critical_threshold_db,
+      }).select().single();
+
+      if (!error && data) {
+        localStore.apartments.push(data as Apartment);
+        localStore.notify();
+        return data as Apartment;
+      }
+    }
+
+    localStore.apartments.push(newApt);
+    localStore.notify();
+    return newApt;
+  },
+
+  async updateApartmentThresholds(dto: UpdateApartmentThresholdsDTO): Promise<boolean> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('apartments').update({
+        custom_day_threshold_db: dto.custom_day_threshold_db,
+        custom_night_threshold_db: dto.custom_night_threshold_db,
+        custom_critical_threshold_db: dto.custom_critical_threshold_db,
+      }).eq('id', dto.apartmentId);
+
+      if (error) return false;
+    }
+
+    const apt = localStore.apartments.find(a => a.id === dto.apartmentId);
+    if (apt) {
+      if (dto.custom_day_threshold_db !== undefined) apt.custom_day_threshold_db = dto.custom_day_threshold_db ?? undefined;
+      if (dto.custom_night_threshold_db !== undefined) apt.custom_night_threshold_db = dto.custom_night_threshold_db ?? undefined;
+      if (dto.custom_critical_threshold_db !== undefined) apt.custom_critical_threshold_db = dto.custom_critical_threshold_db ?? undefined;
+      localStore.notify();
+      return true;
+    }
+    return false;
+  },
+
+  async deleteApartment(apartmentId: string): Promise<boolean> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('apartments').delete().eq('id', apartmentId);
+      if (error) return false;
+    }
+
+    // Desvincular moradores locais
+    localStore.profiles.forEach(p => {
+      if (p.apartment_id === apartmentId) {
+        p.apartment_id = null;
+        p.apartment_number = undefined;
+      }
+    });
+
+    localStore.apartments = localStore.apartments.filter(a => a.id !== apartmentId);
+    localStore.devices = localStore.devices.filter(d => d.apartment_id !== apartmentId);
+    localStore.notify();
+    return true;
+  },
+
+  async clearMockApartments(): Promise<boolean> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.rpc('clear_mock_apartments');
+      if (!error) {
+        localStore.apartments = [];
+        localStore.devices = [];
+        localStore.sensors = [];
+        localStore.alerts = [];
+        localStore.readings = [];
+        localStore.profiles.forEach(p => {
+          if (p.role === 'resident') {
+            p.apartment_id = null;
+            p.apartment_number = undefined;
+          }
+        });
+        localStore.notify();
+        return true;
+      }
+    }
+
+    localStore.apartments = [];
+    localStore.devices = [];
+    localStore.sensors = [];
+    localStore.alerts = [];
+    localStore.readings = [];
+    localStore.profiles.forEach(p => {
+      if (p.role === 'resident') {
+        p.apartment_id = null;
+        p.apartment_number = undefined;
+      }
+    });
+    localStore.notify();
+    return true;
+  },
+
+  // PERFIS E GESTÃO DE MORADORES
+  async getProfiles(): Promise<Profile[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*, apartments(number)')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        return data.map((p: any) => ({
+          ...p,
+          apartment_number: p.apartments?.number || undefined,
+        }));
+      }
+    }
+    return localStore.profiles;
+  },
+
+  async getPendingResidents(): Promise<Profile[]> {
+    const profiles = await this.getProfiles();
+    return profiles.filter(p => p.role === 'resident' && !p.apartment_id);
+  },
+
+  async getAssignedResidents(): Promise<Profile[]> {
+    const profiles = await this.getProfiles();
+    return profiles.filter(p => p.role === 'resident' && Boolean(p.apartment_id));
+  },
+
+  async assignResidentToApartment(profileId: string, apartmentId: string): Promise<boolean> {
+    const apt = localStore.apartments.find(a => a.id === apartmentId);
+    const aptNumber = apt?.number || 'N/A';
+
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ apartment_id: apartmentId, updated_at: new Date().toISOString() })
+        .eq('id', profileId);
+
+      if (error) return false;
+    }
+
+    const p = localStore.profiles.find(prof => prof.id === profileId);
+    if (p) {
+      p.apartment_id = apartmentId;
+      p.apartment_number = aptNumber;
+      p.updated_at = new Date().toISOString();
+      localStore.notify();
+      return true;
+    }
+    return false;
+  },
+
+  async unassignResident(profileId: string): Promise<boolean> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ apartment_id: null, updated_at: new Date().toISOString() })
+        .eq('id', profileId);
+
+      if (error) return false;
+    }
+
+    const p = localStore.profiles.find(prof => prof.id === profileId);
+    if (p) {
+      p.apartment_id = null;
+      p.apartment_number = undefined;
+      p.updated_at = new Date().toISOString();
+      localStore.notify();
+      return true;
+    }
+    return false;
+  },
+
+  async deleteResident(profileId: string): Promise<boolean> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('profiles').delete().eq('id', profileId);
+      if (error) return false;
+    }
+
+    localStore.profiles = localStore.profiles.filter(p => p.id !== profileId);
+    localStore.notify();
+    return true;
+  },
+
+  async getUserHistory(profileId: string): Promise<UserHistoryReport | null> {
+    const profiles = await this.getProfiles();
+    const profile = profiles.find(p => p.id === profileId);
+    if (!profile) return null;
+
+    const apt = profile.apartment_id 
+      ? await this.getApartmentById(profile.apartment_id) 
+      : null;
+
+    // Alertas da unidade
+    const allAlerts = await this.getAlerts(100);
+    const userAlerts = profile.apartment_id 
+      ? allAlerts.filter(a => a.apartment_id === profile.apartment_id) 
+      : [];
+
+    // Ocorrências vinculadas
+    const allOccurrences = await this.getOccurrences();
+    const userOccurrences = allOccurrences.filter(o => 
+      o.reporter_id === profile.id || 
+      (profile.apartment_id && o.apartment_id === profile.apartment_id)
+    );
+
+    // Leituras da unidade
+    const userReadings = profile.apartment_id 
+      ? localStore.readings.filter(r => r.apartment_id === profile.apartment_id).slice(0, 30)
+      : [];
+
+    const daysActive = Math.max(1, Math.round((Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24)));
+
+    return {
+      profile,
+      apartment: apt,
+      alerts: userAlerts,
+      occurrences: userOccurrences,
+      recentReadings: userReadings,
+      stats: {
+        totalAlerts: userAlerts.length,
+        totalOccurrences: userOccurrences.length,
+        peakDbRecorded: apt?.peak_db || 0,
+        daysActive,
+      }
+    };
+  },
+
+  // DISPOSITIVOS
   async getDevices(): Promise<Device[]> {
     if (isSupabaseConfigured && supabase) {
       const { data } = await supabase.from('devices').select('*, apartments(number)');
@@ -207,7 +505,7 @@ export const DataService = {
     return localStore.devices;
   },
 
-  // Sensores
+  // SENSORES
   async getSensors(deviceId?: string): Promise<Sensor[]> {
     if (isSupabaseConfigured && supabase) {
       let query = supabase.from('sensors').select('*');
@@ -220,7 +518,7 @@ export const DataService = {
       : localStore.sensors;
   },
 
-  // Políticas
+  // POLÍTICAS
   async getPolicies(): Promise<NoisePolicy[]> {
     if (isSupabaseConfigured && supabase) {
       const { data } = await supabase.from('noise_policies').select('*').order('start_time');
@@ -243,7 +541,7 @@ export const DataService = {
     return false;
   },
 
-  // Alertas
+  // ALERTAS
   async getAlerts(limit = 20): Promise<Alert[]> {
     if (isSupabaseConfigured && supabase) {
       const { data } = await supabase.from('alerts').select('*, apartments(number)').order('created_at', { ascending: false }).limit(limit);
@@ -266,7 +564,7 @@ export const DataService = {
     localStore.notify();
   },
 
-  // Ocorrências
+  // OCORRÊNCIAS
   async getOccurrences(): Promise<Occurrence[]> {
     if (isSupabaseConfigured && supabase) {
       const { data } = await supabase.from('occurrences').select('*, profiles(full_name)').order('created_at', { ascending: false });
@@ -298,26 +596,27 @@ export const DataService = {
       if (data) {
         return data.map((c: any) => ({
           ...c,
-          author_name: c.profiles?.full_name || 'Usuário'
+          author_name: c.profiles?.full_name || 'Administrador'
         }));
       }
     }
     return localStore.comments[occurrenceId] || [];
   },
 
-  async addComment(occurrenceId: string, comment: string, authorName = 'Administrador'): Promise<OccurrenceComment> {
+  async addComment(occurrenceId: string, authorId: string, comment: string, authorName?: string): Promise<OccurrenceComment> {
     const newComment: OccurrenceComment = {
       id: `comm-${Date.now()}`,
       occurrence_id: occurrenceId,
-      author_id: 'admin1',
-      author_name: authorName,
+      author_id: authorId,
       comment,
       created_at: new Date().toISOString(),
+      author_name: authorName || 'Administrador'
     };
 
     if (isSupabaseConfigured && supabase) {
       await supabase.from('occurrence_comments').insert({
         occurrence_id: occurrenceId,
+        author_id: authorId,
         comment,
       });
     }
@@ -352,7 +651,6 @@ export const DataService = {
     };
 
     if (isSupabaseConfigured && supabase) {
-      // Inserção direta no Supabase (dispara o trigger trg_process_noise_reading)
       await supabase.from('noise_readings').insert({
         apartment_id: data.apartment_id,
         decibel: data.decibel,
@@ -363,7 +661,6 @@ export const DataService = {
       });
     }
 
-    // Processa também no store reativo local para UI instantânea
     localStore.processNoiseReading(reading);
   },
 
@@ -376,12 +673,10 @@ export const DataService = {
       }
     }
 
-    // Limpeza no store local
     const beforeCount = localStore.readings.length;
     localStore.readings = localStore.readings.filter(r => !r.is_test_data);
     localStore.alerts = localStore.alerts.filter(a => !a.id.startsWith('alt-'));
     
-    // Restaurar status dos apartamentos
     localStore.apartments.forEach(apt => {
       if (apt.number === '103') apt.status = 'warning';
       else if (apt.number === '202') apt.status = 'critical';
