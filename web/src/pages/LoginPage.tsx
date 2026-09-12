@@ -30,7 +30,7 @@ export const LoginPage: React.FC = () => {
     setErrorMsg(null);
     setSuccessInfo(null);
 
-    const res = await login(loginEmail, loginPassword);
+    const res = await login(loginEmail.trim().toLowerCase(), loginPassword);
     if (!res.success) {
       setErrorMsg(res.message || 'Credenciais inválidas. Verifique os dados ou confirme seu e-mail.');
     }
@@ -41,6 +41,17 @@ export const LoginPage: React.FC = () => {
     setErrorMsg(null);
     setSuccessInfo(null);
 
+    const cleanEmail = signupEmail.trim().toLowerCase();
+    const cleanName = fullName.trim();
+
+    if (!cleanEmail) {
+      setErrorMsg('Por favor, informe um e-mail válido.');
+      return;
+    }
+    if (!cleanName) {
+      setErrorMsg('Por favor, informe seu nome completo.');
+      return;
+    }
     if (signupPassword.length < 6) {
       setErrorMsg('A senha precisa ter pelo menos 6 caracteres.');
       return;
@@ -51,10 +62,10 @@ export const LoginPage: React.FC = () => {
     }
 
     const res = await signUp({
-      fullName,
-      email: signupEmail,
+      fullName: cleanName,
+      email: cleanEmail,
       password: signupPassword,
-      phone,
+      phone: phone.trim(),
     });
 
     if (res.success) {
