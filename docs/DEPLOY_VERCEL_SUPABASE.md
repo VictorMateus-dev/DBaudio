@@ -1,4 +1,4 @@
-﻿# Guia de Vinculação: Supabase + Vercel (dBSound)
+# Guia de Vinculação: Supabase + Vercel (dBSound)
 
 Este guia orienta passo a passo a ativação do banco de dados na nuvem (**Supabase**) e a publicação do painel web (**Vercel**).
 
