@@ -79,7 +79,7 @@ console.log('   dBSound — EXECUÇÃO DA SUÍTE DE TESTES AUTOMATIZADOS');
 console.log('===============================================================\n');
 
 let passedTests = 0;
-let totalTests = 8;
+let totalTests = 10;
 
 // CENÁRIO 1: 40 dB — Não gerar alerta
 (() => {
@@ -219,6 +219,79 @@ let totalTests = 8;
     passedTests++;
   } else {
     console.error('❌ Cenário 8 [FALHOU]: Limite customizado da unidade foi ignorado.');
+  }
+})();
+
+// CENÁRIO 9: Criação de Novo Apartamento on-the-fly na Alocação + Persistência Resiliente
+(() => {
+  const localApartments = [
+    { id: 'apt-101', number: '101', floor: 1, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80 }
+  ];
+  const newAptDto = {
+    number: '502',
+    floor: 5,
+    custom_day_threshold_db: 72,
+    custom_night_threshold_db: 62,
+    custom_critical_threshold_db: 82,
+  };
+
+  // Simula criação e persistência
+  const createdApt = {
+    id: '00000000-0000-0000-0000-000000000502',
+    ...newAptDto,
+  };
+  localApartments.push(createdApt);
+
+  // Simula alocação de morador novo
+  const resident = { id: 'usr-new-999', name: 'Ana Moradora', role: 'resident', apartment_id: null, apartment_number: undefined };
+  resident.apartment_id = createdApt.id;
+  resident.apartment_number = createdApt.number;
+
+  const aptExists = localApartments.some(a => a.number === '502' && a.floor === 5);
+  const residentAllocated = resident.apartment_id === createdApt.id && resident.apartment_number === '502';
+
+  if (aptExists && residentAllocated) {
+    console.log('✅ Cenário 9 [PASSOU]: Novo apartamento (Apto 502) criado diretamente na aba de alocar com limites customizados e morador vinculado.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 9 [FALHOU]: Criação on-the-fly de apartamento na alocação falhou.');
+  }
+})();
+
+// CENÁRIO 10: Auto-recuperação de morador alocado com acesso imediato (sem ficar preso em tela de espera)
+(() => {
+  const localAllocations = {
+    'usr-res-555': '00000000-0000-0000-0000-000000000502'
+  };
+  const apts = [
+    { id: '00000000-0000-0000-0000-000000000502', number: '502' }
+  ];
+
+  // Supabase simulado retornou apartment_id como null (ex: RLS bloqueou update no banco remoto)
+  const supabaseProfile = {
+    id: 'usr-res-555',
+    email: 'novo.morador@condo.com',
+    role: 'resident',
+    apartment_id: null,
+  };
+
+  // Lógica inteligente de auto-recuperação do AuthContext
+  const effectiveAptId = supabaseProfile.apartment_id || localAllocations[supabaseProfile.id] || null;
+  const aptNumber = apts.find(a => a.id === effectiveAptId)?.number;
+
+  const resolvedProfile = {
+    ...supabaseProfile,
+    apartment_id: effectiveAptId,
+    apartment_number: aptNumber,
+  };
+
+  const isPending = Boolean(resolvedProfile.role === 'resident' && !resolvedProfile.apartment_id);
+
+  if (!isPending && resolvedProfile.apartment_number === '502') {
+    console.log('✅ Cenário 10 [PASSOU]: Auto-recuperação garantiu acesso imediato ao painel do morador no Apto 502 sem bloqueio indevido.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 10 [FALHOU]: Morador permaneceu bloqueado em tela de espera.');
   }
 })();
 

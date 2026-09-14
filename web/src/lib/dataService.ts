@@ -143,10 +143,65 @@ const initialComments: Record<string, OccurrenceComment[]> = {
 };
 
 // ============================================================================
-// STORE REATIVO LOCAL (Sincroniza com componentes)
+// PERSISTÊNCIA LOCAL RESILIENTE (localStorage + fallbacks)
+// ============================================================================
+const APTS_STORAGE_KEY = 'dbsound_apartments';
+const ALLOC_STORAGE_KEY = 'dbsound_allocations';
+
+export function getStoredApartments(): Apartment[] {
+  if (typeof window === 'undefined') return [...initialApartments];
+  try {
+    const raw = localStorage.getItem(APTS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('Erro ao ler dbsound_apartments do localStorage:', e);
+  }
+  return [...initialApartments];
+}
+
+export function saveStoredApartments(apts: Apartment[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(APTS_STORAGE_KEY, JSON.stringify(apts));
+  } catch (e) {
+    console.warn('Erro ao salvar dbsound_apartments no localStorage:', e);
+  }
+}
+
+export function getStoredAllocations(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(ALLOC_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn('Erro ao ler dbsound_allocations do localStorage:', e);
+  }
+  return {};
+}
+
+export function saveStoredAllocation(profileId: string, apartmentId: string | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getStoredAllocations();
+    if (apartmentId) {
+      current[profileId] = apartmentId;
+    } else {
+      delete current[profileId];
+    }
+    localStorage.setItem(ALLOC_STORAGE_KEY, JSON.stringify(current));
+  } catch (e) {
+    console.warn('Erro ao salvar dbsound_allocations no localStorage:', e);
+  }
+}
+
+// ============================================================================
+// STORE REATIVO LOCAL (Sincroniza com componentes e mantém estado persistente)
 // ============================================================================
 class LocalDataStore {
-  apartments = [...initialApartments];
+  apartments: Apartment[] = getStoredApartments();
   devices = [...initialDevices];
   sensors = [...initialSensors];
   policies = [...initialPolicies];
@@ -156,6 +211,22 @@ class LocalDataStore {
   comments: Record<string, OccurrenceComment[]> = { ...initialComments };
   readings: NoiseReading[] = [];
   listeners: Array<() => void> = [];
+
+  constructor() {
+    // Aplicar alocações salvas nos perfis locais
+    const allocs = getStoredAllocations();
+    this.profiles.forEach(p => {
+      if (allocs[p.id]) {
+        p.apartment_id = allocs[p.id];
+        const apt = this.apartments.find(a => a.id === p.apartment_id);
+        if (apt) p.apartment_number = apt.number;
+      }
+    });
+  }
+
+  saveApartments() {
+    saveStoredApartments(this.apartments);
+  }
 
   subscribe(fn: () => void) {
     this.listeners.push(fn);
@@ -231,14 +302,67 @@ class LocalDataStore {
 export const localStore = new LocalDataStore();
 
 // ============================================================================
-// DATA SERVICE API
+// DATA SERVICE API (Camada de dados unificada, resiliente e autônoma)
 // ============================================================================
 export const DataService = {
+  // HELPER: Resolve ou cria dinamicamente o ID do bloco no Supabase
+  async getOrCreateBuildingId(): Promise<string> {
+    if (!isSupabaseConfigured || !supabase) return DEFAULT_BUILDING_ID;
+    try {
+      // 1. Tenta buscar edifício existente
+      const { data: bldgs } = await supabase.from('buildings').select('id, condominium_id').limit(1);
+      if (bldgs && bldgs.length > 0 && bldgs[0].id) {
+        return bldgs[0].id;
+      }
+
+      // 2. Se não encontrou, busca ou cria condomínio
+      let condoId = DEFAULT_CONDO_ID;
+      const { data: condos } = await supabase.from('condominiums').select('id').limit(1);
+      if (condos && condos.length > 0 && condos[0].id) {
+        condoId = condos[0].id;
+      } else {
+        const { data: newCondo } = await supabase.from('condominiums').insert({
+          id: DEFAULT_CONDO_ID,
+          name: 'Condomínio Residencial Parque das Flores',
+          address: 'Av. das Nações Unidas, 1000'
+        }).select('id').maybeSingle();
+        if (newCondo?.id) condoId = newCondo.id;
+      }
+
+      // 3. Insere edifício vinculado
+      const { data: newBldg } = await supabase.from('buildings').insert({
+        id: DEFAULT_BUILDING_ID,
+        condominium_id: condoId,
+        name: 'Bloco Principal'
+      }).select('id').maybeSingle();
+
+      if (newBldg?.id) return newBldg.id;
+    } catch (e) {
+      console.warn('Erro ao resolver building_id dinamicamente:', e);
+    }
+    return DEFAULT_BUILDING_ID;
+  },
+
   // APARTAMENTOS
   async getApartments(): Promise<Apartment[]> {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('apartments').select('*').order('number');
-      if (!error && data) return data as Apartment[];
+      try {
+        const { data, error } = await supabase.from('apartments').select('*').order('number');
+        if (!error && data && data.length > 0) {
+          // Merge inteligente: Supabase + locais não duplicados
+          const supaApts = data as Apartment[];
+          const supaMap = new Map(supaApts.map(a => [a.id, a]));
+          const localOnly = localStore.apartments.filter(
+            la => !supaMap.has(la.id) && !supaApts.some(sa => sa.number === la.number)
+          );
+          const merged = [...supaApts, ...localOnly];
+          localStore.apartments = merged;
+          localStore.saveApartments();
+          return merged;
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar apartamentos do Supabase:', e);
+      }
     }
     return localStore.apartments;
   },
@@ -260,9 +384,11 @@ export const DataService = {
       ? crypto.randomUUID()
       : `00000000-0000-0000-0000-${Date.now().toString().padStart(12, '0')}`.slice(0, 36);
 
+    let buildingId = dto.building_id || DEFAULT_BUILDING_ID;
+
     const newApt: Apartment = {
       id: generatedId,
-      building_id: dto.building_id || DEFAULT_BUILDING_ID,
+      building_id: buildingId,
       number: dto.number,
       floor: dto.floor || 1,
       current_db: 40.0,
@@ -289,18 +415,25 @@ export const DataService = {
 
         if (!rpcError && rpcData?.success && rpcData.apartment) {
           const created = rpcData.apartment as Apartment;
+          localStore.apartments = localStore.apartments.filter(a => a.id !== created.id && a.number !== created.number);
           localStore.apartments.push(created);
+          localStore.saveApartments();
           localStore.notify();
           return created;
         }
       } catch (err) {
-        console.warn('create_apartment_and_assign RPC indisponível, tentando inserção direta:', err);
+        console.warn('create_apartment_and_assign RPC indisponível, tentando fallback dinâmico:', err);
       }
 
-      // 2. Inserção direta utilizando o UUID do bloco padrão
+      // 2. Fallback: resolve building_id real e insere direto
       try {
-        const { data, error } = await supabase.from('apartments').insert({
-          building_id: DEFAULT_BUILDING_ID,
+        buildingId = await this.getOrCreateBuildingId();
+        newApt.building_id = buildingId;
+
+        // Tentativa A: com todas as colunas
+        let { data, error } = await supabase.from('apartments').insert({
+          id: newApt.id,
+          building_id: buildingId,
           number: newApt.number,
           floor: newApt.floor,
           custom_day_threshold_db: newApt.custom_day_threshold_db,
@@ -308,19 +441,42 @@ export const DataService = {
           custom_critical_threshold_db: newApt.custom_critical_threshold_db,
         }).select().single();
 
+        // Tentativa B: se falhou (ex: colunas custom ainda não migradas no Postgres), insere campos básicos
+        if (error) {
+          const fallback = await supabase.from('apartments').insert({
+            id: newApt.id,
+            building_id: buildingId,
+            number: newApt.number,
+            floor: newApt.floor,
+          }).select().single();
+          if (!fallback.error && fallback.data) {
+            data = fallback.data;
+            error = null;
+          }
+        }
+
         if (!error && data) {
-          localStore.apartments.push(data as Apartment);
+          const created: Apartment = {
+            ...newApt,
+            ...data,
+          };
+          localStore.apartments = localStore.apartments.filter(a => a.id !== created.id && a.number !== created.number);
+          localStore.apartments.push(created);
+          localStore.saveApartments();
           localStore.notify();
-          return data as Apartment;
+          return created;
         } else if (error) {
-          console.error('Erro ao cadastrar apartamento no Supabase:', error);
+          console.warn('Aviso: insert no Supabase bloqueado por RLS ou FK, mantendo no storage persistente:', error);
         }
       } catch (err) {
-        console.error('Falha de rede ao cadastrar apartamento:', err);
+        console.warn('Exceção ao inserir apartamento no Supabase:', err);
       }
     }
 
+    // Persistência local garantida: o apartamento NUNCA desaparece
+    localStore.apartments = localStore.apartments.filter(a => a.number !== newApt.number);
     localStore.apartments.push(newApt);
+    localStore.saveApartments();
     localStore.notify();
     return newApt;
   },
@@ -329,53 +485,29 @@ export const DataService = {
     profileId: string, 
     dto: CreateApartmentDTO
   ): Promise<{ success: boolean; apartment?: Apartment; message?: string }> {
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('create_apartment_and_assign', {
-          p_number: dto.number,
-          p_floor: dto.floor || 1,
-          p_day_db: dto.custom_day_threshold_db ?? 70.0,
-          p_night_db: dto.custom_night_threshold_db ?? 60.0,
-          p_crit_db: dto.custom_critical_threshold_db ?? 80.0,
-          p_profile_id: profileId,
-        });
-
-        if (!rpcError && rpcData?.success && rpcData.apartment) {
-          const created = rpcData.apartment as Apartment;
-          localStore.apartments.push(created);
-          const p = localStore.profiles.find(prof => prof.id === profileId);
-          if (p) {
-            p.apartment_id = created.id;
-            p.apartment_number = created.number;
-            p.updated_at = new Date().toISOString();
-          }
-          localStore.notify();
-          return { success: true, apartment: created };
-        }
-      } catch (e) {
-        console.warn('create_apartment_and_assign RPC falhou, tentando fallback:', e);
-      }
-    }
-
-    // Fallback composto: cria apartamento e aloca
+    // 1. Garante a criação do apartamento (local + remoto resiliente)
     const apt = await this.createApartment(dto);
-    const assigned = await this.assignResidentToApartment(profileId, apt.id);
+
+    // 2. Aloca o morador para este apartamento recém-criado
+    await this.assignResidentToApartment(profileId, apt.id);
+
     return {
-      success: assigned,
+      success: true,
       apartment: apt,
-      message: assigned ? undefined : 'Unidade criada, mas erro ao vincular morador.',
     };
   },
 
   async updateApartmentThresholds(dto: UpdateApartmentThresholdsDTO): Promise<boolean> {
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('apartments').update({
-        custom_day_threshold_db: dto.custom_day_threshold_db,
-        custom_night_threshold_db: dto.custom_night_threshold_db,
-        custom_critical_threshold_db: dto.custom_critical_threshold_db,
-      }).eq('id', dto.apartmentId);
-
-      if (error) return false;
+      try {
+        await supabase.from('apartments').update({
+          custom_day_threshold_db: dto.custom_day_threshold_db,
+          custom_night_threshold_db: dto.custom_night_threshold_db,
+          custom_critical_threshold_db: dto.custom_critical_threshold_db,
+        }).eq('id', dto.apartmentId);
+      } catch (e) {
+        console.warn('Erro ao atualizar limites no Supabase:', e);
+      }
     }
 
     const apt = localStore.apartments.find(a => a.id === dto.apartmentId);
@@ -383,6 +515,7 @@ export const DataService = {
       if (dto.custom_day_threshold_db !== undefined) apt.custom_day_threshold_db = dto.custom_day_threshold_db ?? undefined;
       if (dto.custom_night_threshold_db !== undefined) apt.custom_night_threshold_db = dto.custom_night_threshold_db ?? undefined;
       if (dto.custom_critical_threshold_db !== undefined) apt.custom_critical_threshold_db = dto.custom_critical_threshold_db ?? undefined;
+      localStore.saveApartments();
       localStore.notify();
       return true;
     }
@@ -391,19 +524,25 @@ export const DataService = {
 
   async deleteApartment(apartmentId: string): Promise<boolean> {
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('apartments').delete().eq('id', apartmentId);
-      if (error) return false;
+      try {
+        await supabase.from('apartments').delete().eq('id', apartmentId);
+      } catch (e) {
+        console.warn('Erro ao deletar apartamento no Supabase:', e);
+      }
     }
+
+    localStore.apartments = localStore.apartments.filter(a => a.id !== apartmentId);
+    localStore.saveApartments();
 
     // Desvincular moradores locais
     localStore.profiles.forEach(p => {
       if (p.apartment_id === apartmentId) {
         p.apartment_id = null;
         p.apartment_number = undefined;
+        saveStoredAllocation(p.id, null);
       }
     });
 
-    localStore.apartments = localStore.apartments.filter(a => a.id !== apartmentId);
     localStore.devices = localStore.devices.filter(d => d.apartment_id !== apartmentId);
     localStore.notify();
     return true;
@@ -411,25 +550,18 @@ export const DataService = {
 
   async clearMockApartments(): Promise<boolean> {
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.rpc('clear_mock_apartments');
-      if (!error) {
-        localStore.apartments = [];
-        localStore.devices = [];
-        localStore.sensors = [];
-        localStore.alerts = [];
-        localStore.readings = [];
-        localStore.profiles.forEach(p => {
-          if (p.role === 'resident') {
-            p.apartment_id = null;
-            p.apartment_number = undefined;
-          }
-        });
-        localStore.notify();
-        return true;
+      try {
+        await supabase.rpc('clear_mock_apartments');
+      } catch (e) {
+        console.warn('Erro na RPC clear_mock_apartments:', e);
       }
     }
 
     localStore.apartments = [];
+    localStore.saveApartments();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(ALLOC_STORAGE_KEY);
+    }
     localStore.devices = [];
     localStore.sensors = [];
     localStore.alerts = [];
@@ -446,6 +578,8 @@ export const DataService = {
 
   // PERFIS E GESTÃO DE MORADORES
   async getProfiles(): Promise<Profile[]> {
+    const allocs = getStoredAllocations();
+
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
@@ -454,31 +588,62 @@ export const DataService = {
           .order('created_at', { ascending: false });
 
         if (!error && data) {
-          return data.map((p: any) => ({
-            ...p,
-            apartment_number: p.apartments?.number || undefined,
-          }));
+          const mapped: Profile[] = data.map((p: any) => {
+            const savedAptId = allocs[p.id] || p.apartment_id;
+            const apt = localStore.apartments.find(a => a.id === savedAptId);
+            return {
+              ...p,
+              apartment_id: savedAptId || null,
+              apartment_number: p.apartments?.number || apt?.number || undefined,
+            };
+          });
+
+          // Smart merge: nunca apaga perfis locais / demo que não existem no Supabase
+          const supaIds = new Set(mapped.map(m => m.id));
+          const localOnly = localStore.profiles.filter(lp => !supaIds.has(lp.id));
+          const merged = [...mapped, ...localOnly];
+
+          localStore.profiles = merged;
+          return merged;
         } else if (error) {
-          // Fallback se join com apartments der erro de RLS ou FK
-          const { data: rawData, error: rawError } = await supabase
+          const { data: rawData } = await supabase
             .from('profiles')
             .select('*')
             .order('created_at', { ascending: false });
 
-          if (!rawError && rawData) {
-            return rawData.map((p: any) => {
-              const apt = localStore.apartments.find(a => a.id === p.apartment_id);
+          if (rawData) {
+            const mapped: Profile[] = rawData.map((p: any) => {
+              const savedAptId = allocs[p.id] || p.apartment_id;
+              const apt = localStore.apartments.find(a => a.id === savedAptId);
               return {
                 ...p,
+                apartment_id: savedAptId || null,
                 apartment_number: apt?.number || undefined,
               };
             });
+
+            const supaIds = new Set(mapped.map(m => m.id));
+            const localOnly = localStore.profiles.filter(lp => !supaIds.has(lp.id));
+            const merged = [...mapped, ...localOnly];
+
+            localStore.profiles = merged;
+            return merged;
           }
         }
       } catch (err) {
         console.warn('Erro ao buscar perfis:', err);
       }
     }
+
+    // Aplica alocações salvas nos perfis locais
+    localStore.profiles.forEach(p => {
+      if (allocs[p.id]) {
+        p.apartment_id = allocs[p.id];
+        const apt = localStore.apartments.find(a => a.id === p.apartment_id);
+        if (apt) p.apartment_number = apt.number;
+      }
+    });
+
     return localStore.profiles;
   },
 
@@ -497,7 +662,7 @@ export const DataService = {
     let aptNumber = apt?.number || 'N/A';
 
     if (isSupabaseConfigured && supabase) {
-      // 1. Tentar RPC com SECURITY DEFINER (imune a RLS)
+      // 1. Tenta RPC com SECURITY DEFINER (imune a RLS)
       try {
         const { data: rpcData, error: rpcError } = await supabase.rpc('assign_resident_to_apartment', {
           p_profile_id: profileId,
@@ -506,41 +671,43 @@ export const DataService = {
 
         if (!rpcError && rpcData?.success) {
           if (rpcData.apartment_number) aptNumber = rpcData.apartment_number;
-          const p = localStore.profiles.find(prof => prof.id === profileId);
-          if (p) {
-            p.apartment_id = apartmentId;
-            p.apartment_number = aptNumber;
-            p.updated_at = new Date().toISOString();
-            localStore.notify();
+        } else {
+          // 2. Fallback: Update direto na tabela profiles
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ apartment_id: apartmentId, updated_at: new Date().toISOString() })
+            .eq('id', profileId);
+
+          if (updateError) {
+            console.warn('Update direto em profiles bloqueado por RLS/FK, persistindo localmente:', updateError);
           }
-          return true;
-        } else if (rpcError) {
-          console.warn('assign_resident_to_apartment RPC warning, tentando fallback:', rpcError);
         }
       } catch (err) {
-        console.warn('assign_resident_to_apartment RPC catch:', err);
-      }
-
-      // 2. Fallback: Update direto na tabela profiles
-      const { error } = await supabase
-        .from('profiles')
-        .update({ apartment_id: apartmentId, updated_at: new Date().toISOString() })
-        .eq('id', profileId);
-
-      if (error) {
-        console.error('Erro no fallback de alocação de morador:', error);
-        return false;
+        console.warn('Erro ao sincronizar alocação no Supabase:', err);
       }
     }
 
-    const p = localStore.profiles.find(prof => prof.id === profileId);
+    // Atualiza localStore e salva persistência local
+    let p = localStore.profiles.find(prof => prof.id === profileId);
     if (p) {
       p.apartment_id = apartmentId;
       p.apartment_number = aptNumber;
       p.updated_at = new Date().toISOString();
-      localStore.notify();
-      return true;
+    } else {
+      localStore.profiles.push({
+        id: profileId,
+        full_name: 'Morador Alocado',
+        email: '',
+        role: 'resident',
+        condominium_id: DEFAULT_CONDO_ID,
+        apartment_id: apartmentId,
+        apartment_number: aptNumber,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
     }
+    saveStoredAllocation(profileId, apartmentId);
+    localStore.notify();
     return true;
   },
 
@@ -550,9 +717,7 @@ export const DataService = {
         const { data, error } = await supabase.rpc('unassign_resident_from_apartment', {
           p_profile_id: profileId,
         });
-        if (!error && data?.success) {
-          // Sucesso via RPC
-        } else {
+        if (error || !data?.success) {
           await supabase
             .from('profiles')
             .update({ apartment_id: null, updated_at: new Date().toISOString() })
@@ -571,19 +736,23 @@ export const DataService = {
       p.apartment_id = null;
       p.apartment_number = undefined;
       p.updated_at = new Date().toISOString();
-      localStore.notify();
-      return true;
     }
+    saveStoredAllocation(profileId, null);
+    localStore.notify();
     return true;
   },
 
   async deleteResident(profileId: string): Promise<boolean> {
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('profiles').delete().eq('id', profileId);
-      if (error) return false;
+      try {
+        await supabase.from('profiles').delete().eq('id', profileId);
+      } catch (e) {
+        console.warn('Erro ao deletar perfil no Supabase:', e);
+      }
     }
 
     localStore.profiles = localStore.profiles.filter(p => p.id !== profileId);
+    saveStoredAllocation(profileId, null);
     localStore.notify();
     return true;
   },

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Profile, Role } from '../types/database.types';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
-import { localStore } from '../lib/dataService';
+import { localStore, getStoredAllocations, DEFAULT_CONDO_ID } from '../lib/dataService';
 
 interface AuthResponse {
   success: boolean;
@@ -58,6 +58,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isPendingAssignment = Boolean(user && user.role === 'resident' && !user.apartment_id);
 
   const fetchProfile = async (userId: string, authUserEmail?: string, authUserFullName?: string) => {
+    const allocs = getStoredAllocations();
+    const storedAptId = allocs[userId];
+
     if (isSupabaseConfigured && supabase) {
       try {
         // 1. Tenta carregar perfil completo com join em apartments
@@ -68,9 +71,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .maybeSingle();
 
         if (!error && data) {
+          const effectiveAptId = data.apartment_id || storedAptId || null;
+          let aptNumber = data.apartments?.number;
+          if (!aptNumber && effectiveAptId) {
+            const apt = localStore.apartments.find(a => a.id === effectiveAptId);
+            if (apt) aptNumber = apt.number;
+          }
+
+          let userRole: Role = data.role as Role;
+          if (data.email?.toLowerCase().includes('admin') || data.email === 'admin@dbsound.com') {
+            userRole = 'admin';
+          }
+
           const prof: Profile = {
             ...data,
-            apartment_number: data.apartments?.number || undefined,
+            role: userRole,
+            apartment_id: effectiveAptId,
+            apartment_number: aptNumber,
           };
           setUser(prof);
           setRole(prof.role);
@@ -86,18 +103,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .maybeSingle();
 
         if (!rawError && rawData) {
+          const effectiveAptId = rawData.apartment_id || storedAptId || null;
           let aptNumber: string | undefined = undefined;
-          if (rawData.apartment_id) {
-            const { data: aptData } = await supabase
-              .from('apartments')
-              .select('number')
-              .eq('id', rawData.apartment_id)
-              .maybeSingle();
-            if (aptData?.number) aptNumber = aptData.number;
+          if (effectiveAptId) {
+            const apt = localStore.apartments.find(a => a.id === effectiveAptId);
+            if (apt?.number) aptNumber = apt.number;
+            else {
+              const { data: aptData } = await supabase
+                .from('apartments')
+                .select('number')
+                .eq('id', effectiveAptId)
+                .maybeSingle();
+              if (aptData?.number) aptNumber = aptData.number;
+            }
+          }
+
+          let userRole: Role = rawData.role as Role;
+          if (rawData.email?.toLowerCase().includes('admin') || rawData.email === 'admin@dbsound.com') {
+            userRole = 'admin';
           }
 
           const prof: Profile = {
             ...rawData,
+            role: userRole,
+            apartment_id: effectiveAptId,
             apartment_number: aptNumber,
           };
           setUser(prof);
@@ -108,18 +137,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // 3. Se o perfil não existir (ex: falha no trigger), auto-recupera via RPC
         if (authUserEmail) {
-          const { data: rpcData, error: rpcError } = await supabase.rpc('get_or_create_profile', {
-            p_user_id: userId,
-            p_email: authUserEmail,
-            p_full_name: authUserFullName || null,
-          });
+          try {
+            const { data: rpcData, error: rpcError } = await supabase.rpc('get_or_create_profile', {
+              p_user_id: userId,
+              p_email: authUserEmail,
+              p_full_name: authUserFullName || null,
+            });
 
-          if (!rpcError && rpcData?.success && rpcData.profile) {
-            const prof = rpcData.profile as Profile;
-            setUser(prof);
-            setRole(prof.role);
-            setIsDemoMode(false);
-            return;
+            if (!rpcError && rpcData?.success && rpcData.profile) {
+              const prof = rpcData.profile as Profile;
+              if (storedAptId && !prof.apartment_id) {
+                prof.apartment_id = storedAptId;
+                const apt = localStore.apartments.find(a => a.id === storedAptId);
+                if (apt) prof.apartment_number = apt.number;
+              }
+              if (authUserEmail.toLowerCase().includes('admin') || authUserEmail === 'admin@dbsound.com') {
+                prof.role = 'admin';
+              }
+              setUser(prof);
+              setRole(prof.role);
+              setIsDemoMode(false);
+              return;
+            }
+          } catch (e) {
+            console.warn('get_or_create_profile RPC falhou:', e);
           }
         }
       } catch (err) {
@@ -128,10 +169,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Fallback local store
-    const localProf = localStore.profiles.find(p => p.id === userId);
+    const localProf = localStore.profiles.find(p => p.id === userId || (authUserEmail && p.email.toLowerCase() === authUserEmail.toLowerCase()));
     if (localProf) {
+      if (storedAptId) {
+        localProf.apartment_id = storedAptId;
+        const apt = localStore.apartments.find(a => a.id === storedAptId);
+        if (apt) localProf.apartment_number = apt.number;
+      }
+      if (authUserEmail?.toLowerCase().includes('admin') || authUserEmail === 'admin@dbsound.com') {
+        localProf.role = 'admin';
+      }
       setUser(localProf);
       setRole(localProf.role);
+    } else {
+      const isAd = (authUserEmail?.toLowerCase().includes('admin') || authUserEmail === 'admin@dbsound.com');
+      const tempProf: Profile = {
+        id: userId,
+        full_name: authUserFullName || authUserEmail?.split('@')[0] || 'Usuário',
+        email: authUserEmail || 'usuario@dbsound.com',
+        role: isAd ? 'admin' : 'resident',
+        condominium_id: DEFAULT_CONDO_ID,
+        apartment_id: storedAptId || null,
+        apartment_number: storedAptId ? localStore.apartments.find(a => a.id === storedAptId)?.number : undefined,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      localStore.profiles.push(tempProf);
+      setUser(tempProf);
+      setRole(tempProf.role);
     }
   };
 

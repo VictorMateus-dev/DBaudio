@@ -68,22 +68,35 @@ export const ResidentsManagementPage: React.FC = () => {
     setTimeout(() => setFeedbackMsg(null), 4500);
   };
 
+  const openAllocationModal = (profile: Profile, preselectedAptId?: string) => {
+    setAllocatingProfile(profile);
+    const initialAptId = preselectedAptId || (apartments.length > 0 ? apartments[0].id : '');
+    setSelectedApartmentId(initialAptId);
+    setAllocationMode(apartments.length > 0 ? 'existing' : 'new');
+    setInlineAptNumber('');
+    setInlineAptFloor(1);
+    setInlineDayDb(70);
+    setInlineNightDb(60);
+    setInlineCritDb(80);
+  };
+
   // Handlers for Resident Assignment
   const handleAssignApartment = async () => {
     if (!allocatingProfile) return;
 
     if (allocationMode === 'existing') {
-      if (!selectedApartmentId) {
-        showFeedback('error', 'Por favor, selecione um apartamento da lista.');
+      const aptIdToUse = selectedApartmentId || (apartments.length > 0 ? apartments[0].id : '');
+      if (!aptIdToUse) {
+        showFeedback('error', 'Nenhum apartamento disponível. Use a opção "+ Nova Unidade" para criar uma nova unidade.');
         return;
       }
-      const ok = await DataService.assignResidentToApartment(allocatingProfile.id, selectedApartmentId);
+      const ok = await DataService.assignResidentToApartment(allocatingProfile.id, aptIdToUse);
       if (ok) {
-        const targetApt = apartments.find(a => a.id === selectedApartmentId);
+        const targetApt = apartments.find(a => a.id === aptIdToUse);
         showFeedback('success', `Morador ${allocatingProfile.full_name} alocado ao Apartamento ${targetApt?.number || ''} com sucesso!`);
         setAllocatingProfile(null);
         setSelectedApartmentId('');
-        loadData();
+        await loadData();
       } else {
         showFeedback('error', 'Falha ao vincular morador ao apartamento. Verifique a conexão com o banco.');
       }
@@ -94,10 +107,10 @@ export const ResidentsManagementPage: React.FC = () => {
       }
       const res = await DataService.createAndAssignApartment(allocatingProfile.id, {
         number: inlineAptNumber.trim(),
-        floor: Number(inlineAptFloor),
-        custom_day_threshold_db: Number(inlineDayDb),
-        custom_night_threshold_db: Number(inlineNightDb),
-        custom_critical_threshold_db: Number(inlineCritDb),
+        floor: Number(inlineAptFloor) || 1,
+        custom_day_threshold_db: Number(inlineDayDb) || 70,
+        custom_night_threshold_db: Number(inlineNightDb) || 60,
+        custom_critical_threshold_db: Number(inlineCritDb) || 80,
       });
 
       if (res.success) {
@@ -105,7 +118,7 @@ export const ResidentsManagementPage: React.FC = () => {
         setAllocatingProfile(null);
         setInlineAptNumber('');
         setInlineAptFloor(1);
-        loadData();
+        await loadData();
       } else {
         showFeedback('error', res.message || 'Falha ao criar unidade e alocar morador.');
       }
@@ -302,11 +315,7 @@ export const ResidentsManagementPage: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setAllocatingProfile(prof);
-                    setSelectedApartmentId(apartments[0]?.id || '');
-                    setAllocationMode(apartments.length > 0 ? 'existing' : 'new');
-                  }}
+                  onClick={() => openAllocationModal(prof)}
                   className="px-3 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-medium shadow-glow-purple shrink-0 transition flex items-center gap-1.5"
                 >
                   <Building2 className="w-3.5 h-3.5" />
@@ -401,9 +410,8 @@ export const ResidentsManagementPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => {
-                                setAllocatingProfile(resident);
-                                setSelectedApartmentId(apartments.find(a => a.id !== resident.apartment_id)?.id || apartments[0]?.id || '');
-                                setAllocationMode('existing');
+                                const otherApt = apartments.find(a => a.id !== resident.apartment_id)?.id || apartments[0]?.id;
+                                openAllocationModal(resident, otherApt);
                               }}
                               title="Trocar morador de apartamento"
                               className="px-2.5 py-1.5 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 border border-violet-500/20 transition text-[11px] flex items-center gap-1"
@@ -532,11 +540,7 @@ export const ResidentsManagementPage: React.FC = () => {
                           {pendingResidents.length > 0 && (
                             <button
                               type="button"
-                              onClick={() => {
-                                setAllocatingProfile(pendingResidents[0]);
-                                setSelectedApartmentId(apt.id);
-                                setAllocationMode('existing');
-                              }}
+                              onClick={() => openAllocationModal(pendingResidents[0], apt.id)}
                               className="px-2.5 py-1 rounded-lg bg-violet-600/30 hover:bg-violet-600 text-violet-200 hover:text-white text-[10px] font-semibold transition flex items-center gap-1 border border-violet-500/30 shadow-glow-purple"
                             >
                               <UserPlus className="w-3 h-3" />
@@ -667,7 +671,7 @@ export const ResidentsManagementPage: React.FC = () => {
                   <div className="space-y-2">
                     <label className="text-slate-300 font-medium">Selecione a Unidade Residencial:</label>
                     <select
-                      value={selectedApartmentId}
+                      value={selectedApartmentId || (apartments.length > 0 ? apartments[0].id : '')}
                       onChange={(e) => setSelectedApartmentId(e.target.value)}
                       className="w-full bg-space-900 border border-white/15 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-violet-500"
                     >
