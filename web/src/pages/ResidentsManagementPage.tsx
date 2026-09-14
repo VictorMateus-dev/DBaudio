@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, Building2, UserPlus, Sliders, Trash2, History, AlertTriangle, 
-  CheckCircle, Clock, Shield, Search, ArrowRight, X, Edit3, Volume2, UserCheck, Sparkles, Filter
+  CheckCircle, Clock, Shield, Search, ArrowRight, X, Edit3, Volume2, UserCheck, Sparkles, Filter, RefreshCw
 } from 'lucide-react';
 import { Profile, Apartment, UserHistoryReport, CreateApartmentDTO, UpdateApartmentThresholdsDTO } from '../types/database.types';
 import { DataService, localStore } from '../lib/dataService';
@@ -210,8 +210,16 @@ export const ResidentsManagementPage: React.FC = () => {
     }
   };
 
-  const pendingResidents = profiles.filter(p => p.role === 'resident' && !p.apartment_id && !p.apartment_number);
-  const activeResidents = profiles.filter(p => p.role === 'resident' && (Boolean(p.apartment_id) || Boolean(p.apartment_number)));
+  const pendingResidents = profiles.filter(p => {
+    const isExplicitAdmin = p.role === 'admin' && (p.email.toLowerCase().includes('admin') || p.email === 'admin@dbsound.com');
+    // Qualquer usuário que não seja estritamente o admin e não tenha apartamento alocado é considerado pendente!
+    return !isExplicitAdmin && !p.apartment_id && !p.apartment_number;
+  });
+
+  const activeResidents = profiles.filter(p => {
+    const isExplicitAdmin = p.role === 'admin' && (p.email.toLowerCase().includes('admin') || p.email === 'admin@dbsound.com');
+    return !isExplicitAdmin && (Boolean(p.apartment_id) || Boolean(p.apartment_number));
+  });
 
   const filteredResidents = (activeTab === 'residents' ? activeResidents : []).filter(p =>
     p.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -237,37 +245,53 @@ export const ResidentsManagementPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Action Tabs Selector */}
-        <div className="flex items-center gap-2 bg-space-900/80 p-1 rounded-2xl border border-white/5">
+        {/* Action Tabs Selector & Cloud Sync Button */}
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setActiveTab('residents')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === 'residents'
-                ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-glow-purple'
-                : 'text-slate-400 hover:text-white'
-            }`}
+            type="button"
+            onClick={async () => {
+              await loadData();
+              showFeedback('success', 'Cadastros e solicitações de moradores sincronizados com sucesso!');
+            }}
+            disabled={isLoading}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-space-900/90 border border-white/10 hover:border-violet-500/40 text-slate-300 hover:text-white text-xs font-semibold shadow-sm transition"
+            title="Sincronizar cadastros de moradores do Supabase"
           >
-            <Users className="w-4 h-4" />
-            <span>Moradores</span>
-            {pendingResidents.length > 0 && (
-              <span className="w-5 h-5 rounded-full bg-amber-500 text-black text-[10px] font-bold flex items-center justify-center">
-                {pendingResidents.length}
-              </span>
-            )}
+            <RefreshCw className={`w-3.5 h-3.5 text-violet-400 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Sincronizar Nuvem</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('apartments')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === 'apartments'
-                ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-glow-purple'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>Unidades & Limites dB</span>
-            <span className="text-[10px] text-slate-400">({apartments.length})</span>
-          </button>
+          <div className="flex items-center gap-1 bg-space-900/80 p-1 rounded-2xl border border-white/5">
+            <button
+              onClick={() => setActiveTab('residents')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === 'residents'
+                  ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-glow-purple'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Moradores</span>
+              {pendingResidents.length > 0 && (
+                <span className="w-5 h-5 rounded-full bg-amber-500 text-black text-[10px] font-bold flex items-center justify-center">
+                  {pendingResidents.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('apartments')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === 'apartments'
+                  ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-glow-purple'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>Unidades & Limites dB</span>
+              <span className="text-[10px] text-slate-400">({apartments.length})</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -501,10 +525,12 @@ export const ResidentsManagementPage: React.FC = () => {
               </div>
             ) : (
               apartments.map((apt) => {
-                const resident = profiles.find(p => 
+                const matching = profiles.filter(p => 
                   p.apartment_id === apt.id || 
                   (p.apartment_number && apt.number && p.apartment_number.trim() === apt.number.trim())
                 );
+                // Prioriza o usuário real (email diferente de @dbsound.com) em vez do morador mockado
+                const resident = matching.find(p => !p.email.includes('@dbsound.com')) || matching[0];
                 return (
                   <div key={apt.id} className="vault-card rounded-3xl p-5 space-y-4 relative group">
                     {/* Apartment Header */}

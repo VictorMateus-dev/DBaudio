@@ -624,19 +624,60 @@ export const DataService = {
   async saveProfile(profile: Profile): Promise<Profile> {
     if (isSupabaseConfigured && supabase) {
       try {
-        await supabase.from('profiles').upsert({
+        // 1. Obter condomínio válido existente no banco para não violar FK
+        let condoId = profile.condominium_id;
+        try {
+          const { data: condoData } = await supabase.from('condominiums').select('id').limit(1).maybeSingle();
+          if (condoData?.id) {
+            condoId = condoData.id;
+          }
+        } catch {
+          // Ignora se consulta falhar
+        }
+
+        const payload = {
           id: profile.id,
           full_name: profile.full_name,
           email: profile.email,
           phone: profile.phone || null,
-          role: profile.role,
-          condominium_id: profile.condominium_id || DEFAULT_CONDO_ID,
+          role: profile.role || 'resident',
+          condominium_id: condoId || DEFAULT_CONDO_ID,
           apartment_id: profile.apartment_id || null,
           created_at: profile.created_at || new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        });
+        };
+
+        // 2. Tenta upsert direto
+        const { error: upsertErr } = await supabase.from('profiles').upsert(payload);
+
+        if (upsertErr) {
+          console.warn('Upsert direto em profiles falhou, tentando fallback via RPC/insert:', upsertErr.message);
+
+          // 3. Tenta RPC get_or_create_profile
+          try {
+            await supabase.rpc('get_or_create_profile', {
+              p_user_id: profile.id,
+              p_email: profile.email,
+              p_full_name: profile.full_name,
+            });
+          } catch (rpcErr) {
+            console.warn('RPC get_or_create_profile falhou:', rpcErr);
+          }
+
+          // 4. Se tiver apartment_id, tenta atualizar
+          if (profile.apartment_id) {
+            try {
+              await supabase.from('profiles').update({
+                apartment_id: profile.apartment_id,
+                updated_at: new Date().toISOString()
+              }).eq('id', profile.id);
+            } catch {
+              // fallback local
+            }
+          }
+        }
       } catch (e) {
-        console.warn('Erro ao persistir perfil no Supabase:', e);
+        console.warn('Exceção ao persistir perfil no Supabase:', e);
       }
     }
     localStore.saveProfile(profile);
@@ -648,13 +689,39 @@ export const DataService = {
 
     if (isSupabaseConfigured && supabase) {
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*, apartments(number)')
-          .order('created_at', { ascending: false });
+        let rawProfiles: any[] | null = null;
 
-        if (!error && data) {
-          const mapped: Profile[] = data.map((p: any) => {
+        // 1. TENTA RPC DE SINCRONIZAÇÃO TOTAL COM AUTH.USERS (Migration 006)
+        // Isso puxa instantaneamente qualquer usuário cadastrado (ex: Breno) mesmo antes de alocado!
+        try {
+          const { data: syncedData, error: syncError } = await supabase.rpc('sync_and_get_all_profiles');
+          if (!syncError && syncedData && Array.isArray(syncedData) && syncedData.length > 0) {
+            rawProfiles = syncedData;
+          }
+        } catch (rpcErr) {
+          console.warn('RPC sync_and_get_all_profiles ainda não aplicada no Supabase:', rpcErr);
+        }
+
+        // 2. Se a RPC não estiver disponível, consulta direta da tabela profiles
+        if (!rawProfiles) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*, apartments(number)')
+            .order('created_at', { ascending: false });
+
+          if (!error && data) {
+            rawProfiles = data;
+          } else {
+            const { data: rawData } = await supabase
+              .from('profiles')
+              .select('*')
+              .order('created_at', { ascending: false });
+            if (rawData) rawProfiles = rawData;
+          }
+        }
+
+        if (rawProfiles && Array.isArray(rawProfiles)) {
+          const mapped: Profile[] = rawProfiles.map((p: any) => {
             const savedAptId = allocs[p.id] || p.apartment_id;
             const apt = localStore.apartments.find(a => a.id === savedAptId || (p.apartment_number && a.number === p.apartment_number));
             return {
@@ -664,39 +731,15 @@ export const DataService = {
             };
           });
 
-          // Smart merge: nunca apaga perfis locais / demo que não existem no Supabase
+          // Smart merge: preserva perfis locais/demo, mas prioriza registros reais vindos da nuvem
           const supaIds = new Set(mapped.map(m => m.id));
-          const localOnly = localStore.profiles.filter(lp => !supaIds.has(lp.id));
+          const supaEmails = new Set(mapped.map(m => m.email.toLowerCase()));
+          const localOnly = localStore.profiles.filter(lp => !supaIds.has(lp.id) && !supaEmails.has(lp.email.toLowerCase()));
           const merged = [...mapped, ...localOnly];
 
           localStore.profiles = merged;
           localStore.saveProfiles();
           return merged;
-        } else if (error) {
-          const { data: rawData } = await supabase
-            .from('profiles')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-          if (rawData) {
-            const mapped: Profile[] = rawData.map((p: any) => {
-              const savedAptId = allocs[p.id] || p.apartment_id;
-              const apt = localStore.apartments.find(a => a.id === savedAptId || (p.apartment_number && a.number === p.apartment_number));
-              return {
-                ...p,
-                apartment_id: savedAptId || apt?.id || null,
-                apartment_number: apt?.number || p.apartment_number || undefined,
-              };
-            });
-
-            const supaIds = new Set(mapped.map(m => m.id));
-            const localOnly = localStore.profiles.filter(lp => !supaIds.has(lp.id));
-            const merged = [...mapped, ...localOnly];
-
-            localStore.profiles = merged;
-            localStore.saveProfiles();
-            return merged;
-          }
         }
       } catch (err) {
         console.warn('Erro ao buscar perfis:', err);

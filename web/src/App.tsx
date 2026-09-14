@@ -13,7 +13,7 @@ import { ResidentMobileView } from './pages/ResidentMobileView';
 import { LoginPage } from './pages/LoginPage';
 import { useAuth } from './contexts/AuthContext';
 import { DataService, localStore } from './lib/dataService';
-import { Apartment, Device, Sensor, Alert, Occurrence, NoisePolicy } from './types/database.types';
+import { Apartment, Device, Sensor, Alert, Occurrence, NoisePolicy, Profile } from './types/database.types';
 
 export const App: React.FC = () => {
   const { user, role } = useAuth();
@@ -27,16 +27,18 @@ export const App: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [policies, setPolicies] = useState<NoisePolicy[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [simulatorAptId, setSimulatorAptId] = useState<string | undefined>(undefined);
 
   const loadAllData = async () => {
-    const [apts, devs, sens, alts, occs, pols] = await Promise.all([
+    const [apts, devs, sens, alts, occs, pols, profs] = await Promise.all([
       DataService.getApartments(),
       DataService.getDevices(),
       DataService.getSensors(),
       DataService.getAlerts(),
       DataService.getOccurrences(),
       DataService.getPolicies(),
+      DataService.getProfiles(),
     ]);
     setApartments([...apts]);
     setDevices([...devs]);
@@ -44,6 +46,7 @@ export const App: React.FC = () => {
     setAlerts([...alts]);
     setOccurrences([...occs]);
     setPolicies([...pols]);
+    setProfiles([...profs]);
   };
 
   useEffect(() => {
@@ -108,7 +111,10 @@ export const App: React.FC = () => {
     setCurrentTab('simulator');
   };
 
-  const pendingResidentsCount = localStore.profiles.filter(p => p.role === 'resident' && !p.apartment_id).length;
+  const pendingResidentsCount = profiles.filter(p => {
+    const isExplicitAdmin = p.role === 'admin' && (p.email.toLowerCase().includes('admin') || p.email === 'admin@dbsound.com');
+    return !isExplicitAdmin && !p.apartment_id && !p.apartment_number;
+  }).length;
 
   return (
     <div className="flex h-screen bg-space-950 text-slate-100 overflow-hidden">

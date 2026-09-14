@@ -194,7 +194,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      localStore.profiles.push(tempProf);
+      // PERSISTÊNCIA ATIVA: Garante que o perfil seja salvo no Supabase para que o síndico veja imediatamente!
+      await DataService.saveProfile(tempProf);
       setUser(tempProf);
       setRole(tempProf.role);
     }
@@ -398,11 +399,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const switchRole = (newRole: Role) => {
     setRole(newRole);
-    if (newRole === 'admin') {
-      setUser(defaultAdminProfile);
-    } else {
-      setUser(defaultResidentProfile);
-    }
+    setUser(prev => {
+      // Se não há usuário logado, utiliza os perfis de demonstração
+      if (!prev) {
+        return newRole === 'admin' ? defaultAdminProfile : defaultResidentProfile;
+      }
+
+      // Se é um usuário real autenticado (ex: Victor com email 8victor49...), PRESERVA ELE!
+      const isDemo = prev.email === 'admin@dbsound.com' || prev.email === 'morador101@dbsound.com';
+      if (isDemo) {
+        return newRole === 'admin' ? defaultAdminProfile : defaultResidentProfile;
+      }
+
+      // Usuário real: mantém o nome, email e dados do usuário
+      if (newRole === 'resident') {
+        const allocs = getStoredAllocations();
+        const effectiveAptId = prev.apartment_id || allocs[prev.id] || null;
+        let aptNumber = prev.apartment_number;
+        if (!aptNumber && effectiveAptId) {
+          const found = localStore.apartments.find(a => a.id === effectiveAptId);
+          if (found) aptNumber = found.number;
+        }
+        return {
+          ...prev,
+          role: 'resident',
+          apartment_id: effectiveAptId,
+          apartment_number: aptNumber,
+        };
+      } else {
+        return {
+          ...prev,
+          role: 'admin',
+        };
+      }
+    });
   };
 
   return (
