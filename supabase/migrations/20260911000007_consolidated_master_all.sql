@@ -87,7 +87,23 @@ CREATE POLICY "Permitir leitura de condominios" ON public.condominiums FOR ALL U
 CREATE POLICY "Permitir leitura de blocos" ON public.buildings FOR ALL USING (true) WITH CHECK (true);
 
 -- ---------------------------------------------------------------------
--- 5. RPC DE SINCRONIZAÇÃO COMPLETA COM AUTH.USERS (PUXA O BRENO E TODOS)
+-- 5. LIMPEZA PRÉVIA DE FUNÇÕES (EVITA ERRO 42P13 DE ALTERAÇÃO DE RETURN TYPE)
+-- ---------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.clear_mock_apartments() CASCADE;
+DROP FUNCTION IF EXISTS public.clear_mock_apartments CASCADE;
+DROP FUNCTION IF EXISTS public.assign_resident_to_apartment(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.assign_resident_to_apartment CASCADE;
+DROP FUNCTION IF EXISTS public.unassign_resident_from_apartment(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.unassign_resident_from_apartment CASCADE;
+DROP FUNCTION IF EXISTS public.create_apartment_and_assign CASCADE;
+DROP FUNCTION IF EXISTS public.get_or_create_profile CASCADE;
+DROP FUNCTION IF EXISTS public.sync_and_get_all_profiles() CASCADE;
+DROP FUNCTION IF EXISTS public.sync_and_get_all_profiles CASCADE;
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS public.handle_new_user CASCADE;
+
+-- ---------------------------------------------------------------------
+-- 5.1. RPC DE SINCRONIZAÇÃO COMPLETA COM AUTH.USERS (PUXA O BRENO E TODOS)
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.sync_and_get_all_profiles()
 RETURNS SETOF public.profiles AS $$
