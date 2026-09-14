@@ -50,12 +50,21 @@ const defaultResidentProfile: Profile = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<Profile | null>(defaultAdminProfile);
-  const [role, setRole] = useState<Role>('admin');
-  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<Profile | null>(() => {
+    // Se Supabase não estiver configurado, usa perfil demo síndico
+    if (!isSupabaseConfigured) return defaultAdminProfile;
+    return null;
+  });
+  const [role, setRole] = useState<Role>(() => {
+    if (!isSupabaseConfigured) return 'admin';
+    return 'resident';
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(isSupabaseConfigured);
   const [isDemoMode, setIsDemoMode] = useState(!isSupabaseConfigured);
 
-  const isPendingAssignment = Boolean(user && user.role === 'resident' && !user.apartment_id);
+  const isPendingAssignment = Boolean(
+    user && user.role === 'resident' && (!user.apartment_id || user.status === 'pending')
+  );
 
   const fetchProfile = async (userId: string, authUserEmail?: string, authUserFullName?: string) => {
     const allocs = getStoredAllocations();
@@ -78,14 +87,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (apt) aptNumber = apt.number;
           }
 
-          let userRole: Role = data.role as Role;
+          let userRole: Role = (data.role as Role) || 'resident';
           if (data.email?.toLowerCase().includes('admin') || data.email === 'admin@dbsound.com') {
             userRole = 'admin';
           }
 
+          const resolvedStatus = data.status || (effectiveAptId ? 'approved' : 'pending');
+
           const prof: Profile = {
             ...data,
             role: userRole,
+            status: resolvedStatus,
             apartment_id: effectiveAptId,
             apartment_number: aptNumber,
           };
@@ -118,14 +130,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
 
-          let userRole: Role = rawData.role as Role;
+          let userRole: Role = (rawData.role as Role) || 'resident';
           if (rawData.email?.toLowerCase().includes('admin') || rawData.email === 'admin@dbsound.com') {
             userRole = 'admin';
           }
 
+          const resolvedStatus = rawData.status || (effectiveAptId ? 'approved' : 'pending');
+
           const prof: Profile = {
             ...rawData,
             role: userRole,
+            status: resolvedStatus,
             apartment_id: effectiveAptId,
             apartment_number: aptNumber,
           };
@@ -154,6 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (authUserEmail.toLowerCase().includes('admin') || authUserEmail === 'admin@dbsound.com') {
                 prof.role = 'admin';
               }
+              prof.status = prof.status || (prof.apartment_id ? 'approved' : 'pending');
               setUser(prof);
               setRole(prof.role);
               setIsDemoMode(false);
@@ -179,6 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (authUserEmail?.toLowerCase().includes('admin') || authUserEmail === 'admin@dbsound.com') {
         localProf.role = 'admin';
       }
+      localProf.status = localProf.status || (localProf.apartment_id ? 'approved' : 'pending');
       setUser(localProf);
       setRole(localProf.role);
     } else {
@@ -188,6 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         full_name: authUserFullName || authUserEmail?.split('@')[0] || 'Usuário',
         email: authUserEmail || 'usuario@dbsound.com',
         role: isAd ? 'admin' : 'resident',
+        status: storedAptId ? 'approved' : 'pending',
         condominium_id: DEFAULT_CONDO_ID,
         apartment_id: storedAptId || null,
         apartment_number: storedAptId ? localStore.apartments.find(a => a.id === storedAptId)?.number : undefined,
@@ -210,10 +228,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const client = supabase;
     if (isSupabaseConfigured && client) {
+      setIsLoading(true);
       client.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
-          fetchProfile(session.user.id, session.user.email, session.user.user_metadata?.full_name);
+          fetchProfile(session.user.id, session.user.email, session.user.user_metadata?.full_name).finally(() => {
+            setIsLoading(false);
+          });
+        } else {
+          setUser(null);
+          setIsLoading(false);
         }
+      }).catch(() => {
+        setIsLoading(false);
       });
 
       const { data: authListener } = client.auth.onAuthStateChange(async (_event, session) => {
@@ -222,11 +248,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setUser(null);
         }
+        setIsLoading(false);
       });
 
       return () => {
         authListener.subscription.unsubscribe();
       };
+    } else {
+      setIsLoading(false);
     }
   }, []);
 
@@ -398,20 +427,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchRole = (newRole: Role) => {
-    setRole(newRole);
     setUser(prev => {
       // Se não há usuário logado, utiliza os perfis de demonstração
       if (!prev) {
+        setRole(newRole);
         return newRole === 'admin' ? defaultAdminProfile : defaultResidentProfile;
       }
 
-      // Se é um usuário real autenticado (ex: Victor com email 8victor49...), PRESERVA ELE!
       const isDemo = prev.email === 'admin@dbsound.com' || prev.email === 'morador101@dbsound.com';
+      const isActualAdmin = isDemo || prev.email?.toLowerCase().includes('admin') || prev.role === 'admin';
+
+      // Usuário comum (morador) não pode se auto-promover a síndico!
+      if (!isActualAdmin && newRole === 'admin') {
+        console.warn('Acesso negado: moradores não possuem permissão para alternar para síndico.');
+        return prev;
+      }
+
+      setRole(newRole);
+
       if (isDemo) {
         return newRole === 'admin' ? defaultAdminProfile : defaultResidentProfile;
       }
 
-      // Usuário real: mantém o nome, email e dados do usuário
+      // Usuário real: preserva os dados do usuário original
       if (newRole === 'resident') {
         const allocs = getStoredAllocations();
         const effectiveAptId = prev.apartment_id || allocs[prev.id] || null;
@@ -422,14 +460,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         return {
           ...prev,
-          role: 'resident',
           apartment_id: effectiveAptId,
           apartment_number: aptNumber,
         };
       } else {
         return {
           ...prev,
-          role: 'admin',
         };
       }
     });

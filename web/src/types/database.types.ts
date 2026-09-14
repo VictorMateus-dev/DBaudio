@@ -35,12 +35,15 @@ export interface Apartment {
   custom_critical_threshold_db?: number;
 }
 
+export type ProfileStatus = 'pending' | 'approved' | 'blocked';
+
 export interface Profile {
   id: string;
   full_name: string;
   email: string;
   phone?: string;
   role: Role;
+  status?: ProfileStatus;
   condominium_id: string;
   apartment_id?: string | null;
   apartment_number?: string;

@@ -53,6 +53,7 @@ const initialProfiles: Profile[] = [
     email: 'admin@dbsound.com',
     phone: '(11) 98888-0001',
     role: 'admin',
+    status: 'approved',
     condominium_id: DEFAULT_CONDO_ID,
     apartment_id: null,
     created_at: new Date(Date.now() - 3600000 * 24 * 120).toISOString(),
@@ -64,6 +65,7 @@ const initialProfiles: Profile[] = [
     email: 'morador101@dbsound.com',
     phone: '(11) 97777-0101',
     role: 'resident',
+    status: 'approved',
     condominium_id: DEFAULT_CONDO_ID,
     apartment_id: '10100000-0000-0000-0000-000000000101',
     apartment_number: '101',
@@ -76,6 +78,7 @@ const initialProfiles: Profile[] = [
     email: 'morador202@dbsound.com',
     phone: '(11) 96666-0202',
     role: 'resident',
+    status: 'approved',
     condominium_id: DEFAULT_CONDO_ID,
     apartment_id: '20200000-0000-0000-0000-000000000202',
     apartment_number: '202',
@@ -88,6 +91,7 @@ const initialProfiles: Profile[] = [
     email: 'lucas.morador@email.com',
     phone: '(11) 95555-9999',
     role: 'resident',
+    status: 'pending',
     condominium_id: DEFAULT_CONDO_ID,
     apartment_id: null,
     created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
@@ -622,6 +626,8 @@ export const DataService = {
 
   // PERFIS E GESTÃO DE MORADORES
   async saveProfile(profile: Profile): Promise<Profile> {
+    const computedStatus = profile.status || (profile.role === 'admin' ? 'approved' : (profile.apartment_id ? 'approved' : 'pending'));
+
     if (isSupabaseConfigured && supabase) {
       try {
         // 1. Obter condomínio válido existente no banco para não violar FK
@@ -641,6 +647,7 @@ export const DataService = {
           email: profile.email,
           phone: profile.phone || null,
           role: profile.role || 'resident',
+          status: computedStatus,
           condominium_id: condoId || DEFAULT_CONDO_ID,
           apartment_id: profile.apartment_id || null,
           created_at: profile.created_at || new Date().toISOString(),
@@ -669,6 +676,7 @@ export const DataService = {
             try {
               await supabase.from('profiles').update({
                 apartment_id: profile.apartment_id,
+                status: 'approved',
                 updated_at: new Date().toISOString()
               }).eq('id', profile.id);
             } catch {
@@ -680,8 +688,13 @@ export const DataService = {
         console.warn('Exceção ao persistir perfil no Supabase:', e);
       }
     }
-    localStore.saveProfile(profile);
-    return profile;
+
+    const savedProf: Profile = {
+      ...profile,
+      status: computedStatus,
+    };
+    localStore.saveProfile(savedProf);
+    return savedProf;
   },
 
   async getProfiles(): Promise<Profile[]> {
@@ -691,8 +704,7 @@ export const DataService = {
       try {
         let rawProfiles: any[] | null = null;
 
-        // 1. TENTA RPC DE SINCRONIZAÇÃO TOTAL COM AUTH.USERS (Migration 006)
-        // Isso puxa instantaneamente qualquer usuário cadastrado (ex: Breno) mesmo antes de alocado!
+        // 1. TENTA RPC DE SINCRONIZAÇÃO TOTAL COM AUTH.USERS
         try {
           const { data: syncedData, error: syncError } = await supabase.rpc('sync_and_get_all_profiles');
           if (!syncError && syncedData && Array.isArray(syncedData) && syncedData.length > 0) {
@@ -724,8 +736,11 @@ export const DataService = {
           const mapped: Profile[] = rawProfiles.map((p: any) => {
             const savedAptId = allocs[p.id] || p.apartment_id;
             const apt = localStore.apartments.find(a => a.id === savedAptId || (p.apartment_number && a.number === p.apartment_number));
+            const statusVal = p.status || (p.role === 'admin' ? 'approved' : (savedAptId ? 'approved' : 'pending'));
+
             return {
               ...p,
+              status: statusVal,
               apartment_id: savedAptId || apt?.id || null,
               apartment_number: p.apartments?.number || apt?.number || p.apartment_number || undefined,
             };
@@ -750,6 +765,7 @@ export const DataService = {
     localStore.profiles.forEach(p => {
       if (allocs[p.id]) {
         p.apartment_id = allocs[p.id];
+        p.status = 'approved';
         const apt = localStore.apartments.find(a => a.id === p.apartment_id || (p.apartment_number && a.number === p.apartment_number));
         if (apt) p.apartment_number = apt.number;
       }
@@ -760,12 +776,12 @@ export const DataService = {
 
   async getPendingResidents(): Promise<Profile[]> {
     const profiles = await this.getProfiles();
-    return profiles.filter(p => p.role === 'resident' && !p.apartment_id);
+    return profiles.filter(p => p.role === 'resident' && (!p.apartment_id || p.status === 'pending'));
   },
 
   async getAssignedResidents(): Promise<Profile[]> {
     const profiles = await this.getProfiles();
-    return profiles.filter(p => p.role === 'resident' && Boolean(p.apartment_id));
+    return profiles.filter(p => p.role === 'resident' && Boolean(p.apartment_id) && p.status === 'approved');
   },
 
   async assignResidentToApartment(profileId: string, apartmentId: string): Promise<boolean> {
@@ -773,7 +789,25 @@ export const DataService = {
     let aptNumber = apt?.number || 'N/A';
 
     if (isSupabaseConfigured && supabase) {
-      // 1. Tenta RPC com SECURITY DEFINER (imune a RLS)
+      // 1. Assegura que o apartamento existe na tabela apartments do Supabase (impede FK violation)
+      try {
+        const { data: existingApt } = await supabase.from('apartments').select('id, number').eq('id', apartmentId).maybeSingle();
+        if (!existingApt && apt) {
+          await supabase.from('apartments').insert({
+            id: apt.id,
+            building_id: apt.building_id || DEFAULT_BUILDING_ID,
+            number: apt.number,
+            floor: apt.floor || 1,
+            custom_day_threshold_db: apt.custom_day_threshold_db ?? 70,
+            custom_night_threshold_db: apt.custom_night_threshold_db ?? 60,
+            custom_critical_threshold_db: apt.custom_critical_threshold_db ?? 80,
+          });
+        }
+      } catch (e) {
+        console.warn('Aviso: falha preventiva ao garantir apartamento no Supabase:', e);
+      }
+
+      // 2. Tenta RPC atômica com SECURITY DEFINER
       try {
         const { data: rpcData, error: rpcError } = await supabase.rpc('assign_resident_to_apartment', {
           p_profile_id: profileId,
@@ -783,10 +817,15 @@ export const DataService = {
         if (!rpcError && rpcData?.success) {
           if (rpcData.apartment_number) aptNumber = rpcData.apartment_number;
         } else {
-          // 2. Fallback: Update direto na tabela profiles
+          // 3. Fallback: Update direto na tabela profiles com status='approved'
           const { error: updateError } = await supabase
             .from('profiles')
-            .update({ apartment_id: apartmentId, updated_at: new Date().toISOString() })
+            .update({
+              apartment_id: apartmentId,
+              status: 'approved',
+              role: 'resident',
+              updated_at: new Date().toISOString()
+            })
             .eq('id', profileId);
 
           if (updateError) {
@@ -803,6 +842,7 @@ export const DataService = {
     if (p) {
       p.apartment_id = apartmentId;
       p.apartment_number = aptNumber;
+      p.status = 'approved';
       p.updated_at = new Date().toISOString();
       localStore.saveProfile(p);
     } else {
@@ -811,6 +851,7 @@ export const DataService = {
         full_name: 'Morador Alocado',
         email: '',
         role: 'resident',
+        status: 'approved',
         condominium_id: DEFAULT_CONDO_ID,
         apartment_id: apartmentId,
         apartment_number: aptNumber,
@@ -833,13 +874,13 @@ export const DataService = {
         if (error || !data?.success) {
           await supabase
             .from('profiles')
-            .update({ apartment_id: null, updated_at: new Date().toISOString() })
+            .update({ apartment_id: null, status: 'pending', updated_at: new Date().toISOString() })
             .eq('id', profileId);
         }
       } catch (err) {
         await supabase
           .from('profiles')
-          .update({ apartment_id: null, updated_at: new Date().toISOString() })
+          .update({ apartment_id: null, status: 'pending', updated_at: new Date().toISOString() })
           .eq('id', profileId);
       }
     }
@@ -847,8 +888,10 @@ export const DataService = {
     const p = localStore.profiles.find(prof => prof.id === profileId);
     if (p) {
       p.apartment_id = null;
+      p.status = 'pending';
       p.apartment_number = undefined;
       p.updated_at = new Date().toISOString();
+      localStore.saveProfile(p);
     }
     saveStoredAllocation(profileId, null);
     localStore.notify();

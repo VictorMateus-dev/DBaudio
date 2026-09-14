@@ -1,7 +1,7 @@
 -- =====================================================================
 -- dBSound: Migration 007 — SCRIPT MESTRE CONSOLIDADO DEFINITIVO
--- (Combina Migrations 005 + 006: Alocação, Criação de Apartamentos, 
--- Limites de dB por Unidade, RLS Total e Sincronização Automática com auth.users)
+-- (Combina Migrations 005 + 006 + Status Explícito 'pending'/'approved'
+--  Alocação, Criação de Apartamentos, Limites de dB, RLS Total e Sincronização)
 -- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -19,23 +19,47 @@ VALUES ('00000000-0000-0000-0000-000000000002'::UUID, '00000000-0000-0000-0000-0
 ON CONFLICT (id) DO NOTHING;
 
 -- ---------------------------------------------------------------------
--- 2. COLUNAS DE LIMITES CUSTOMIZADOS DE DECIBÉIS POR APARTAMENTO
+-- 2. GARANTIA DAS UNIDADES BASE (101 a 303) NA TABELA APARTMENTS
 -- ---------------------------------------------------------------------
 ALTER TABLE public.apartments 
     ADD COLUMN IF NOT EXISTS custom_day_threshold_db NUMERIC DEFAULT 70.0,
     ADD COLUMN IF NOT EXISTS custom_night_threshold_db NUMERIC DEFAULT 60.0,
     ADD COLUMN IF NOT EXISTS custom_critical_threshold_db NUMERIC DEFAULT 80.0;
 
+INSERT INTO public.apartments (id, building_id, number, floor, custom_day_threshold_db, custom_night_threshold_db, custom_critical_threshold_db)
+VALUES
+    ('10100000-0000-0000-0000-000000000101'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '101', 1, 70.0, 60.0, 80.0),
+    ('10200000-0000-0000-0000-000000000102'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '102', 1, 70.0, 60.0, 80.0),
+    ('10300000-0000-0000-0000-000000000103'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '103', 1, 70.0, 60.0, 80.0),
+    ('20100000-0000-0000-0000-000000000201'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '201', 2, 70.0, 60.0, 80.0),
+    ('20200000-0000-0000-0000-000000000202'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '202', 2, 70.0, 60.0, 80.0),
+    ('20300000-0000-0000-0000-000000000203'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '203', 2, 70.0, 60.0, 80.0),
+    ('30100000-0000-0000-0000-000000000301'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '301', 3, 70.0, 60.0, 80.0),
+    ('30200000-0000-0000-0000-000000000302'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '302', 3, 70.0, 60.0, 80.0),
+    ('30300000-0000-0000-0000-000000000303'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '303', 3, 70.0, 60.0, 80.0)
+ON CONFLICT (id) DO UPDATE SET
+    number = EXCLUDED.number,
+    floor = EXCLUDED.floor;
+
 -- ---------------------------------------------------------------------
--- 3. REMOÇÃO DE REGRAS OBSOLETAS QUE IMPEDIAM MORADOR SEM APARTAMENTO
+-- 3. STATUS EXPLÍCITO EM PROFILES ('pending', 'approved', 'blocked')
 -- ---------------------------------------------------------------------
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS chk_resident_apartment;
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS chk_resident_apartment_flexible;
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS chk_profile_status;
+
+ALTER TABLE public.profiles 
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';
+
+ALTER TABLE public.profiles
+    ADD CONSTRAINT chk_profile_status CHECK (status IN ('pending', 'approved', 'blocked'));
+
+-- Atualiza administradores e perfis com apartamento existente para 'approved'
+UPDATE public.profiles SET status = 'approved' WHERE role = 'admin' OR apartment_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------
--- 4. POLÍTICAS RLS TOTALMENTE LIBERADAS (Elimina de vez erro 42501)
+-- 4. POLÍTICAS RLS TOTALMENTE PERMISSIVAS (Elimina de vez erro 42501)
 -- ---------------------------------------------------------------------
--- Apartamentos:
 DROP POLICY IF EXISTS "Permitir leitura de apartamentos" ON public.apartments;
 DROP POLICY IF EXISTS "Permitir criacao de apartamentos" ON public.apartments;
 DROP POLICY IF EXISTS "Permitir edicao de apartamentos" ON public.apartments;
@@ -46,7 +70,6 @@ CREATE POLICY "Permitir criacao de apartamentos" ON public.apartments FOR INSERT
 CREATE POLICY "Permitir edicao de apartamentos" ON public.apartments FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir remocao de apartamentos" ON public.apartments FOR DELETE USING (true);
 
--- Perfis:
 DROP POLICY IF EXISTS "Permitir leitura de perfis" ON public.profiles;
 DROP POLICY IF EXISTS "Permitir insercao de perfis" ON public.profiles;
 DROP POLICY IF EXISTS "Permitir criacao de perfis" ON public.profiles;
@@ -58,7 +81,6 @@ CREATE POLICY "Permitir insercao de perfis" ON public.profiles FOR INSERT WITH C
 CREATE POLICY "Permitir atualizacao de perfis" ON public.profiles FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir remocao de perfis" ON public.profiles FOR DELETE USING (true);
 
--- Condomínios e Blocos:
 DROP POLICY IF EXISTS "Permitir leitura de condominios" ON public.condominiums;
 DROP POLICY IF EXISTS "Permitir leitura de blocos" ON public.buildings;
 CREATE POLICY "Permitir leitura de condominios" ON public.condominiums FOR ALL USING (true) WITH CHECK (true);
@@ -82,7 +104,7 @@ BEGIN
 
     -- Puxa qualquer usuário de auth.users que ainda não esteja em public.profiles
     INSERT INTO public.profiles (
-        id, full_name, email, phone, role, condominium_id, apartment_id, created_at, updated_at
+        id, full_name, email, phone, role, status, condominium_id, apartment_id, created_at, updated_at
     )
     SELECT 
         u.id,
@@ -97,6 +119,10 @@ BEGIN
             WHEN u.email ILIKE '%admin%' OR u.raw_user_meta_data->>'role' = 'admin' THEN 'admin'
             ELSE 'resident'
         END AS role,
+        CASE 
+            WHEN u.email ILIKE '%admin%' OR u.raw_user_meta_data->>'role' = 'admin' THEN 'approved'
+            ELSE 'pending'
+        END AS status,
         v_condo_id,
         NULL,
         u.created_at,
@@ -113,13 +139,14 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ---------------------------------------------------------------------
--- 6. TRIGGER AUTOMÁTICO DE NOVO USUÁRIO EM AUTH.USERS
+-- 6. TRIGGER AUTOMÁTICO EM AUTH.USERS
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
     default_condo_id UUID;
     user_role TEXT := 'resident';
+    user_status TEXT := 'pending';
     user_count INT;
 BEGIN
     SELECT id INTO default_condo_id FROM public.condominiums ORDER BY created_at ASC LIMIT 1;
@@ -133,16 +160,18 @@ BEGIN
     SELECT count(*) INTO user_count FROM public.profiles;
     IF NEW.email ILIKE '%admin%' OR user_count = 0 OR (NEW.raw_user_meta_data->>'role') = 'admin' THEN
         user_role := 'admin';
+        user_status := 'approved';
     END IF;
 
     INSERT INTO public.profiles (
-        id, full_name, email, phone, role, condominium_id, apartment_id, created_at, updated_at
+        id, full_name, email, phone, role, status, condominium_id, apartment_id, created_at, updated_at
     ) VALUES (
         NEW.id,
         COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
         NEW.email,
         NEW.raw_user_meta_data->>'phone',
         user_role,
+        user_status,
         default_condo_id,
         NULL,
         now(),
@@ -167,7 +196,7 @@ CREATE TRIGGER on_auth_user_created
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ---------------------------------------------------------------------
--- 7. RPC PARA ALOCAR MORADOR A UM APARTAMENTO EXISTENTE
+-- 7. RPC ATÔMICA PARA APROVAR E ALOCAR MORADOR AO APARTAMENTO
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.assign_resident_to_apartment(
     p_profile_id UUID, 
@@ -175,20 +204,25 @@ CREATE OR REPLACE FUNCTION public.assign_resident_to_apartment(
 )
 RETURNS JSONB AS $$
 DECLARE
-    v_apt_number TEXT;
+    v_apt RECORD;
 BEGIN
-    SELECT number INTO v_apt_number FROM public.apartments WHERE id = p_apartment_id;
-    IF v_apt_number IS NULL THEN
-        INSERT INTO public.apartments (id, building_id, number, floor, custom_day_threshold_db, custom_night_threshold_db, custom_critical_threshold_db)
-        VALUES (p_apartment_id, '00000000-0000-0000-0000-000000000002'::UUID, 'Unidade', 1, 70, 60, 80)
+    -- 1. Garante que o apartamento existe
+    SELECT * INTO v_apt FROM public.apartments WHERE id = p_apartment_id;
+    IF v_apt IS NULL THEN
+        INSERT INTO public.apartments (
+            id, building_id, number, floor, custom_day_threshold_db, custom_night_threshold_db, custom_critical_threshold_db
+        ) VALUES (
+            p_apartment_id, '00000000-0000-0000-0000-000000000002'::UUID, 'Unidade', 1, 70, 60, 80
+        )
         ON CONFLICT (id) DO NOTHING;
 
-        SELECT number INTO v_apt_number FROM public.apartments WHERE id = p_apartment_id;
-        IF v_apt_number IS NULL THEN v_apt_number := 'Alocado'; END IF;
+        SELECT * INTO v_apt FROM public.apartments WHERE id = p_apartment_id;
     END IF;
 
+    -- 2. Atualiza perfil: status vira 'approved', apartment_id vinculado e role 'resident'
     UPDATE public.profiles
     SET apartment_id = p_apartment_id,
+        status = 'approved',
         role = 'resident',
         updated_at = now()
     WHERE id = p_profile_id;
@@ -197,7 +231,8 @@ BEGIN
         'success', true,
         'profile_id', p_profile_id,
         'apartment_id', p_apartment_id,
-        'apartment_number', v_apt_number
+        'apartment_number', COALESCE(v_apt.number, 'Alocado'),
+        'status', 'approved'
     );
 EXCEPTION
     WHEN OTHERS THEN
@@ -206,17 +241,18 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ---------------------------------------------------------------------
--- 8. RPC PARA DESVINCULAR MORADOR
+-- 8. RPC PARA DESVINCULAR MORADOR (RETORNA PARA PENDING)
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.unassign_resident_from_apartment(p_profile_id UUID)
 RETURNS JSONB AS $$
 BEGIN
     UPDATE public.profiles
     SET apartment_id = NULL,
+        status = 'pending',
         updated_at = now()
     WHERE id = p_profile_id;
 
-    RETURN jsonb_build_object('success', true);
+    RETURN jsonb_build_object('success', true, 'status', 'pending');
 EXCEPTION
     WHEN OTHERS THEN
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
@@ -273,6 +309,7 @@ BEGIN
     IF p_profile_id IS NOT NULL THEN
         UPDATE public.profiles
         SET apartment_id = v_new_apt.id,
+            status = 'approved',
             role = 'resident',
             updated_at = now()
         WHERE id = p_profile_id;
@@ -281,7 +318,8 @@ BEGIN
     RETURN jsonb_build_object(
         'success', true,
         'apartment', row_to_json(v_new_apt),
-        'assigned_to_profile_id', p_profile_id
+        'assigned_to_profile_id', p_profile_id,
+        'status', 'approved'
     );
 EXCEPTION
     WHEN OTHERS THEN
@@ -295,7 +333,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.clear_mock_apartments()
 RETURNS JSONB AS $$
 BEGIN
-    UPDATE public.profiles SET apartment_id = NULL WHERE role = 'resident';
+    UPDATE public.profiles SET apartment_id = NULL, status = 'pending' WHERE role = 'resident';
     DELETE FROM public.alerts;
     DELETE FROM public.noise_readings;
     DELETE FROM public.noise_events;
@@ -322,6 +360,7 @@ DECLARE
     v_condo_id UUID;
     v_apt_number TEXT;
     v_role TEXT := 'resident';
+    v_status TEXT := 'pending';
     v_user_count INT;
 BEGIN
     SELECT * INTO v_profile FROM public.profiles WHERE id = p_user_id;
@@ -338,15 +377,17 @@ BEGIN
         SELECT count(*) INTO v_user_count FROM public.profiles;
         IF p_email ILIKE '%admin%' OR v_user_count = 0 THEN
             v_role := 'admin';
+            v_status := 'approved';
         END IF;
 
         INSERT INTO public.profiles (
-            id, full_name, email, role, condominium_id, apartment_id, created_at, updated_at
+            id, full_name, email, role, status, condominium_id, apartment_id, created_at, updated_at
         ) VALUES (
             p_user_id,
             COALESCE(p_full_name, split_part(p_email, '@', 1)),
             p_email,
             v_role,
+            v_status,
             v_condo_id,
             NULL,
             now(),
@@ -367,6 +408,7 @@ BEGIN
             'email', v_profile.email,
             'phone', v_profile.phone,
             'role', v_profile.role,
+            'status', v_profile.status,
             'condominium_id', v_profile.condominium_id,
             'apartment_id', v_profile.apartment_id,
             'apartment_number', v_apt_number,
@@ -378,7 +420,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ---------------------------------------------------------------------
--- 12. PERMISSÕES DE ACESSO TOTAIS (GRANT EXECUTE)
+-- 12. PERMISSÕES DE ACESSO TOTAIS
 -- ---------------------------------------------------------------------
 GRANT ALL ON public.apartments TO anon, authenticated, service_role;
 GRANT ALL ON public.profiles TO anon, authenticated, service_role;

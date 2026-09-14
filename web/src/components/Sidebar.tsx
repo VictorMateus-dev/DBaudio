@@ -118,23 +118,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          {/* Quick Role Toggle */}
-          <div className="grid grid-cols-2 gap-1 bg-space-900 p-1 rounded-xl text-[10px]">
+          {/* Preview Morador Toggle */}
+          <div className="pt-1">
             <button
-              onClick={() => switchRole('admin')}
-              className={`py-1 rounded-lg font-semibold transition ${
-                role === 'admin' ? 'bg-violet-600 text-white shadow-glow-purple' : 'text-slate-400 hover:text-white'
-              }`}
+              type="button"
+              onClick={() => {
+                window.location.href = '/morador/inicio';
+              }}
+              className="w-full py-1.5 px-2 rounded-xl bg-space-900 hover:bg-violet-500/20 text-slate-300 hover:text-violet-200 border border-white/5 hover:border-violet-500/30 text-[11px] font-medium transition flex items-center justify-center gap-1.5"
             >
-              Síndico
-            </button>
-            <button
-              onClick={() => switchRole('resident')}
-              className={`py-1 rounded-lg font-semibold transition ${
-                role === 'resident' ? 'bg-violet-600 text-white shadow-glow-purple' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Morador
+              <UserCheck className="w-3.5 h-3.5 text-violet-400" />
+              <span>Ver Visão do Morador</span>
             </button>
           </div>
         </div>

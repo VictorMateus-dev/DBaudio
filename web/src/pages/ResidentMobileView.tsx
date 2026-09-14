@@ -15,7 +15,8 @@ import {
   Info,
   Building2,
   Clock,
-  Sparkles
+  Sparkles,
+  LogOut
 } from 'lucide-react';
 import { Apartment, Alert, Occurrence } from '../types/database.types';
 import { DataService, localStore } from '../lib/dataService';
@@ -34,7 +35,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   occurrences,
   onRefresh,
 }) => {
-  const { user, switchRole, refreshProfile } = useAuth();
+  const { user, switchRole, refreshProfile, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'occurrences' | 'profile' | 'privacy'>('home');
   const [activeModalAlert, setActiveModalAlert] = useState<Alert | null>(null);
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
@@ -115,23 +116,25 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   };
 
   // TELA DE ESPERA: Quando o morador confirmou e-mail mas ainda não foi alocado a um apartamento
-  if (!user?.apartment_id) {
+  if (!user?.apartment_id || user?.status === 'pending') {
     return (
       <div className="min-h-screen bg-space-950 p-4 md:p-8 flex flex-col items-center justify-center relative overflow-hidden">
         {/* Atmospheric Glow */}
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[500px] bg-violet-600/15 blur-[120px] pointer-events-none" />
 
-        {/* Top Banner with Role Switcher */}
+        {/* Top Bar */}
         <div className="w-full max-w-md mb-4 flex items-center justify-between text-xs text-slate-400 px-2 relative z-10">
           <div className="flex items-center space-x-2">
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-            <span className="text-white font-medium">App Morador (Aguardando Alocação)</span>
+            <span className="text-white font-medium">dBSound • App Morador</span>
           </div>
           <button
-            onClick={() => switchRole('admin')}
-            className="px-3.5 py-1.5 rounded-full bg-violet-600 text-white font-semibold text-xs shadow-glow-purple hover:bg-violet-500 transition"
+            onClick={() => logout()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.05] hover:bg-red-500/20 text-slate-400 hover:text-red-300 border border-white/10 transition text-xs"
+            title="Sair da Conta"
           >
-            Painel Síndico
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sair</span>
           </button>
         </div>
 
@@ -144,23 +147,23 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-semibold">
               <Clock className="w-3.5 h-3.5" />
-              <span>Status: Aguardando Alocação</span>
+              <span>Status: Cadastro em Análise / Aguardando Alocação</span>
             </div>
             <h2 className="text-xl font-extrabold text-white">Olá, {user?.full_name || 'Novo Morador'}!</h2>
             <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
-              Sua conta foi criada e verificada no Supabase. O síndico do condomínio foi notificado e fará a vinculação da sua unidade residencial em breve.
+              Sua conta está confirmada no sistema. O síndico do condomínio já pode visualizar sua solicitação e fará a vinculação da sua unidade residencial em instantes.
             </p>
           </div>
 
           <div className="p-4 rounded-2xl bg-space-900/90 border border-white/5 text-left text-xs space-y-2.5">
             <div className="font-semibold text-white flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-violet-400" />
-              <span>Como funciona a ativação:</span>
+              <span>Como funciona a liberação:</span>
             </div>
             <div className="space-y-2 text-slate-400 text-[11px]">
               <div className="flex items-start gap-2">
                 <span className="w-4 h-4 rounded-full bg-violet-500/20 text-violet-300 flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
-                <span>O síndico acessa a aba "Moradores" e vincula seu cadastro à sua unidade.</span>
+                <span>O síndico acessa a aba "Moradores" e aloca você ao seu apartamento.</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="w-4 h-4 rounded-full bg-violet-500/20 text-violet-300 flex items-center justify-center text-[10px] font-bold shrink-0">2</span>
@@ -171,17 +174,17 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
 
           <div className="space-y-2 pt-1">
             <button
-              onClick={() => { refreshProfile(); onRefresh(); }}
+              onClick={async () => { await refreshProfile(); onRefresh(); }}
               className="w-full py-3.5 rounded-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold text-xs shadow-glow-purple transition flex items-center justify-center gap-2"
             >
               <Clock className="w-4 h-4" />
               <span>Verificar se Já Fui Alocado</span>
             </button>
             <button
-              onClick={() => switchRole('admin')}
-              className="w-full py-2.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 text-xs font-medium transition"
+              onClick={() => logout()}
+              className="w-full py-2.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-slate-200 text-xs font-medium transition"
             >
-              Alternar para Síndico (Demonstração)
+              Sair da Conta
             </button>
           </div>
         </div>
@@ -201,17 +204,28 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setIsPhoneFrame(!isPhoneFrame)}
-            className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 hover:text-white transition flex items-center gap-1"
+            className="px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 hover:text-white transition flex items-center gap-1 text-[11px]"
           >
             <Smartphone className="w-3.5 h-3.5" />
             <span>{isPhoneFrame ? 'Expandir' : 'Moldura'}</span>
           </button>
 
+          {/* Botão de retorno visível APENAS para administradores em modo teste */}
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => switchRole('admin')}
+              className="px-2.5 py-1 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-500 transition text-[11px]"
+            >
+              Voltar ao Síndico
+            </button>
+          )}
+
           <button
-            onClick={() => switchRole('admin')}
-            className="px-2.5 py-1 rounded bg-blue-600 text-white font-semibold hover:bg-blue-500 transition"
+            onClick={() => logout()}
+            className="p-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition"
+            title="Sair da Conta"
           >
-            Voltar para Síndico
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -444,6 +458,19 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                     Termos de Privacidade (LGPD)
                   </span>
                   <ChevronRight className="w-4 h-4 text-slate-500" />
+                </button>
+
+                <div className="h-px bg-white/5 my-1" />
+
+                <button
+                  onClick={() => logout()}
+                  className="w-full text-left py-2 flex items-center justify-between text-red-400 hover:text-red-300"
+                >
+                  <span className="flex items-center gap-2">
+                    <LogOut className="w-4 h-4" />
+                    Sair da Conta
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-red-400/50" />
                 </button>
               </div>
             </div>
