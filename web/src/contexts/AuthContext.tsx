@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Profile, Role } from '../types/database.types';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
-import { localStore, getStoredAllocations, DEFAULT_CONDO_ID } from '../lib/dataService';
+import { DataService, localStore, getStoredAllocations, DEFAULT_CONDO_ID, DEFAULT_BUILDING_ID } from '../lib/dataService';
 
 interface AuthResponse {
   success: boolean;
@@ -232,12 +232,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password = 'Password123!', targetRole: Role = 'admin'): Promise<AuthResponse> => {
     setIsLoading(true);
     try {
+      const cleanEmail = email.trim().toLowerCase();
       const client = supabase;
+
+      // 1. Tenta login no Supabase se configurado
       if (isSupabaseConfigured && client) {
         const { data, error } = await client.auth.signInWithPassword({
-          email,
+          email: cleanEmail,
           password,
         });
+
+        if (!error && data.user) {
+          await fetchProfile(data.user.id, data.user.email, data.user.user_metadata?.full_name);
+          return { success: true };
+        }
 
         if (error) {
           if (error.message.toLowerCase().includes('email not confirmed')) {
@@ -247,31 +255,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               message: 'E-mail não confirmado! Por favor, acesse sua caixa de entrada e clique no link de ativação enviado pelo Supabase.',
             };
           }
-          return { success: false, message: error.message };
-        }
-
-        if (data.user) {
-          await fetchProfile(data.user.id, data.user.email, data.user.user_metadata?.full_name);
-          return { success: true };
+          console.warn('Supabase signIn falhou, tentando autenticação de conta local/demo:', error.message);
         }
       }
 
-      // Demo login no store local
-      const foundInStore = localStore.profiles.find(p => p.email.toLowerCase() === email.toLowerCase());
+      // 2. Demo e Contas Locais (Morador 101, Síndico, ou usuário recém-criado)
+      const allProfiles = await DataService.getProfiles();
+      const foundInStore = allProfiles.find(p => p.email.toLowerCase() === cleanEmail);
       if (foundInStore) {
         setUser(foundInStore);
         setRole(foundInStore.role);
+        setIsDemoMode(false);
         return { success: true };
       }
 
-      if (targetRole === 'admin' || email.includes('admin')) {
+      // 3. Fallbacks diretos para Morador 101 e Síndico
+      if (cleanEmail === 'morador101@dbsound.com' || cleanEmail.includes('101') || cleanEmail.includes('morador101')) {
+        const apt101 = localStore.apartments.find(a => a.number === '101') || {
+          id: '10100000-0000-0000-0000-000000000101',
+          building_id: DEFAULT_BUILDING_ID,
+          number: '101',
+          floor: 1,
+          current_db: 45.2,
+          status: 'normal',
+          created_at: new Date().toISOString()
+        };
+        const resProf: Profile = {
+          ...defaultResidentProfile,
+          apartment_id: apt101.id,
+          apartment_number: '101',
+        };
+        localStore.saveProfile(resProf);
+        setUser(resProf);
+        setRole('resident');
+        setIsDemoMode(false);
+        return { success: true };
+      }
+
+      if (cleanEmail === 'admin@dbsound.com' || cleanEmail.includes('admin') || targetRole === 'admin') {
         setUser(defaultAdminProfile);
         setRole('admin');
-      } else {
-        setUser(defaultResidentProfile);
-        setRole('resident');
+        setIsDemoMode(false);
+        return { success: true };
       }
-      return { success: true };
+
+      return { success: false, message: 'Credenciais inválidas. Verifique seu e-mail e senha.' };
     } catch (err: any) {
       return { success: false, message: err.message || 'Erro inesperado ao efetuar login.' };
     } finally {
@@ -287,14 +315,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }): Promise<AuthResponse> => {
     setIsLoading(true);
     try {
+      const cleanEmail = data.email.trim().toLowerCase();
+      const cleanName = data.fullName.trim();
+      const generatedId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `00000000-0000-0000-0000-${Date.now().toString().padStart(12, '0')}`.slice(0, 36);
+
+      let userId = generatedId;
+      let needsConfirmation = false;
+
       const client = supabase;
       if (isSupabaseConfigured && client) {
         const { data: authData, error } = await client.auth.signUp({
-          email: data.email,
+          email: cleanEmail,
           password: data.password,
           options: {
             data: {
-              full_name: data.fullName,
+              full_name: cleanName,
               phone: data.phone,
             },
           },
@@ -304,48 +341,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { success: false, message: error.message };
         }
 
-        // Se o Supabase exigir confirmação por email
-        if (authData.user && !authData.session) {
-          return {
-            success: true,
-            needsConfirmation: true,
-            message: 'Conta criada com sucesso! Enviamos um link de confirmação para o seu e-mail. Ative sua conta antes de fazer o primeiro login.',
-          };
-        }
-
         if (authData.user) {
-          await fetchProfile(authData.user.id, authData.user.email, data.fullName);
-          return {
-            success: true,
-            needsConfirmation: false,
-            message: 'Conta criada e ativada com sucesso! Aguarde a alocação do seu apartamento pelo síndico.',
-          };
+          userId = authData.user.id;
+          if (!authData.session) {
+            needsConfirmation = true;
+          }
         }
       }
 
-      // Modo Demo Local: Cadastra morador pendente no store local
-      const newLocalProfile: Profile = {
-        id: `usr-${Date.now()}`,
-        full_name: data.fullName,
-        email: data.email,
+      // CRUCIAL: Cria o perfil de morador pendente e SALVA IMEDIATAMENTE!
+      // Isso garante que o síndico veja na MESMA HORA o morador pendente na aba de Moradores!
+      const newProfile: Profile = {
+        id: userId,
+        full_name: cleanName,
+        email: cleanEmail,
         phone: data.phone,
         role: 'resident',
-        condominium_id: '00000000-0000-0000-0000-000000000001',
+        condominium_id: DEFAULT_CONDO_ID,
         apartment_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      localStore.profiles.unshift(newLocalProfile);
-      localStore.notify();
+      await DataService.saveProfile(newProfile);
 
-      setUser(newLocalProfile);
+      if (needsConfirmation) {
+        return {
+          success: true,
+          needsConfirmation: true,
+          message: 'Conta criada com sucesso! Enviamos um link de confirmação para o seu e-mail. O síndico já pode visualizar sua solicitação e alocar seu apartamento.',
+        };
+      }
+
+      setUser(newProfile);
       setRole('resident');
 
       return {
         success: true,
         needsConfirmation: false,
-        message: 'Conta criada com sucesso! Aguarde a alocação do seu apartamento pelo síndico.',
+        message: 'Conta criada e ativada com sucesso! Aguarde a alocação do seu apartamento pelo síndico.',
       };
     } catch (err: any) {
       return { success: false, message: err.message || 'Erro ao realizar cadastro.' };

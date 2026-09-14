@@ -147,6 +147,7 @@ const initialComments: Record<string, OccurrenceComment[]> = {
 // ============================================================================
 const APTS_STORAGE_KEY = 'dbsound_apartments';
 const ALLOC_STORAGE_KEY = 'dbsound_allocations';
+const PROFILES_STORAGE_KEY = 'dbsound_profiles';
 
 export function getStoredApartments(): Apartment[] {
   if (typeof window === 'undefined') return [...initialApartments];
@@ -197,6 +198,38 @@ export function saveStoredAllocation(profileId: string, apartmentId: string | nu
   }
 }
 
+export function getStoredProfiles(): Profile[] {
+  if (typeof window === 'undefined') return [...initialProfiles];
+  try {
+    const raw = localStorage.getItem(PROFILES_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Assegura que os perfis canônicos (Carlos Síndico, João Silva 101, etc) existam
+        const map = new Map(parsed.map((p: Profile) => [p.id, p]));
+        initialProfiles.forEach(ip => {
+          if (!map.has(ip.id) && !parsed.some((p: Profile) => p.email.toLowerCase() === ip.email.toLowerCase())) {
+            parsed.push(ip);
+          }
+        });
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Erro ao ler dbsound_profiles do localStorage:', e);
+  }
+  return [...initialProfiles];
+}
+
+export function saveStoredProfiles(profiles: Profile[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(profiles));
+  } catch (e) {
+    console.warn('Erro ao salvar dbsound_profiles no localStorage:', e);
+  }
+}
+
 // ============================================================================
 // STORE REATIVO LOCAL (Sincroniza com componentes e mantém estado persistente)
 // ============================================================================
@@ -205,7 +238,7 @@ class LocalDataStore {
   devices = [...initialDevices];
   sensors = [...initialSensors];
   policies = [...initialPolicies];
-  profiles = [...initialProfiles];
+  profiles: Profile[] = getStoredProfiles();
   alerts = [...initialAlerts];
   occurrences = [...initialOccurrences];
   comments: Record<string, OccurrenceComment[]> = { ...initialComments };
@@ -218,7 +251,7 @@ class LocalDataStore {
     this.profiles.forEach(p => {
       if (allocs[p.id]) {
         p.apartment_id = allocs[p.id];
-        const apt = this.apartments.find(a => a.id === p.apartment_id);
+        const apt = this.apartments.find(a => a.id === p.apartment_id || (p.apartment_number && a.number === p.apartment_number));
         if (apt) p.apartment_number = apt.number;
       }
     });
@@ -226,6 +259,17 @@ class LocalDataStore {
 
   saveApartments() {
     saveStoredApartments(this.apartments);
+  }
+
+  saveProfiles() {
+    saveStoredProfiles(this.profiles);
+  }
+
+  saveProfile(profile: Profile) {
+    this.profiles = this.profiles.filter(p => p.id !== profile.id && p.email.toLowerCase() !== profile.email.toLowerCase());
+    this.profiles.unshift(profile);
+    this.saveProfiles();
+    this.notify();
   }
 
   subscribe(fn: () => void) {
@@ -577,6 +621,28 @@ export const DataService = {
   },
 
   // PERFIS E GESTÃO DE MORADORES
+  async saveProfile(profile: Profile): Promise<Profile> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('profiles').upsert({
+          id: profile.id,
+          full_name: profile.full_name,
+          email: profile.email,
+          phone: profile.phone || null,
+          role: profile.role,
+          condominium_id: profile.condominium_id || DEFAULT_CONDO_ID,
+          apartment_id: profile.apartment_id || null,
+          created_at: profile.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.warn('Erro ao persistir perfil no Supabase:', e);
+      }
+    }
+    localStore.saveProfile(profile);
+    return profile;
+  },
+
   async getProfiles(): Promise<Profile[]> {
     const allocs = getStoredAllocations();
 
@@ -590,11 +656,11 @@ export const DataService = {
         if (!error && data) {
           const mapped: Profile[] = data.map((p: any) => {
             const savedAptId = allocs[p.id] || p.apartment_id;
-            const apt = localStore.apartments.find(a => a.id === savedAptId);
+            const apt = localStore.apartments.find(a => a.id === savedAptId || (p.apartment_number && a.number === p.apartment_number));
             return {
               ...p,
-              apartment_id: savedAptId || null,
-              apartment_number: p.apartments?.number || apt?.number || undefined,
+              apartment_id: savedAptId || apt?.id || null,
+              apartment_number: p.apartments?.number || apt?.number || p.apartment_number || undefined,
             };
           });
 
@@ -604,6 +670,7 @@ export const DataService = {
           const merged = [...mapped, ...localOnly];
 
           localStore.profiles = merged;
+          localStore.saveProfiles();
           return merged;
         } else if (error) {
           const { data: rawData } = await supabase
@@ -614,11 +681,11 @@ export const DataService = {
           if (rawData) {
             const mapped: Profile[] = rawData.map((p: any) => {
               const savedAptId = allocs[p.id] || p.apartment_id;
-              const apt = localStore.apartments.find(a => a.id === savedAptId);
+              const apt = localStore.apartments.find(a => a.id === savedAptId || (p.apartment_number && a.number === p.apartment_number));
               return {
                 ...p,
-                apartment_id: savedAptId || null,
-                apartment_number: apt?.number || undefined,
+                apartment_id: savedAptId || apt?.id || null,
+                apartment_number: apt?.number || p.apartment_number || undefined,
               };
             });
 
@@ -627,6 +694,7 @@ export const DataService = {
             const merged = [...mapped, ...localOnly];
 
             localStore.profiles = merged;
+            localStore.saveProfiles();
             return merged;
           }
         }
@@ -639,7 +707,7 @@ export const DataService = {
     localStore.profiles.forEach(p => {
       if (allocs[p.id]) {
         p.apartment_id = allocs[p.id];
-        const apt = localStore.apartments.find(a => a.id === p.apartment_id);
+        const apt = localStore.apartments.find(a => a.id === p.apartment_id || (p.apartment_number && a.number === p.apartment_number));
         if (apt) p.apartment_number = apt.number;
       }
     });
@@ -693,8 +761,9 @@ export const DataService = {
       p.apartment_id = apartmentId;
       p.apartment_number = aptNumber;
       p.updated_at = new Date().toISOString();
+      localStore.saveProfile(p);
     } else {
-      localStore.profiles.push({
+      const newP: Profile = {
         id: profileId,
         full_name: 'Morador Alocado',
         email: '',
@@ -704,7 +773,8 @@ export const DataService = {
         apartment_number: aptNumber,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      });
+      };
+      localStore.saveProfile(newP);
     }
     saveStoredAllocation(profileId, apartmentId);
     localStore.notify();

@@ -210,8 +210,8 @@ export const ResidentsManagementPage: React.FC = () => {
     }
   };
 
-  const pendingResidents = profiles.filter(p => p.role === 'resident' && !p.apartment_id);
-  const activeResidents = profiles.filter(p => p.role === 'resident' && p.apartment_id);
+  const pendingResidents = profiles.filter(p => p.role === 'resident' && !p.apartment_id && !p.apartment_number);
+  const activeResidents = profiles.filter(p => p.role === 'resident' && (Boolean(p.apartment_id) || Boolean(p.apartment_number)));
 
   const filteredResidents = (activeTab === 'residents' ? activeResidents : []).filter(p =>
     p.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -386,7 +386,7 @@ export const ResidentsManagementPage: React.FC = () => {
                         <td className="py-3.5 px-4">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-300 font-medium">
                             <Building2 className="w-3.5 h-3.5 text-violet-400" />
-                            Apto {resident.apartment_number || 'S/N'}
+                            Apto {resident.apartment_number || apartments.find(a => a.id === resident.apartment_id)?.number || 'S/N'}
                           </span>
                         </td>
                         <td className="py-3.5 px-4">
@@ -501,7 +501,10 @@ export const ResidentsManagementPage: React.FC = () => {
               </div>
             ) : (
               apartments.map((apt) => {
-                const resident = profiles.find(p => p.apartment_id === apt.id);
+                const resident = profiles.find(p => 
+                  p.apartment_id === apt.id || 
+                  (p.apartment_number && apt.number && p.apartment_number.trim() === apt.number.trim())
+                );
                 return (
                   <div key={apt.id} className="vault-card rounded-3xl p-5 space-y-4 relative group">
                     {/* Apartment Header */}
