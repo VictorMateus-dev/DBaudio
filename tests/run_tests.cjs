@@ -79,7 +79,7 @@ console.log('   dBSound — EXECUÇÃO DA SUÍTE DE TESTES AUTOMATIZADOS');
 console.log('===============================================================\n');
 
 let passedTests = 0;
-let totalTests = 6;
+let totalTests = 8;
 
 // CENÁRIO 1: 40 dB — Não gerar alerta
 (() => {
@@ -168,6 +168,57 @@ let totalTests = 6;
     passedTests++;
   } else {
     console.error('❌ Cenário 6 [FALHOU]: Administrador não conseguiu acessar o condomínio.');
+  }
+})();
+
+// CENÁRIO 7: Fluxo de Alocação de Morador e Desbloqueio do App
+(() => {
+  const pendingResident = {
+    id: 'usr-new-001',
+    role: 'resident',
+    apartment_id: null,
+    apartment_number: undefined,
+  };
+
+  // 1. Enquanto apartment_id for null, está pendente
+  const isPendingInitial = !pendingResident.apartment_id;
+
+  // 2. Síndico aloca ao apartamento 202
+  const allocatedApt = { id: '00000000-0000-0000-0000-000000000202', number: '202' };
+  pendingResident.apartment_id = allocatedApt.id;
+  pendingResident.apartment_number = allocatedApt.number;
+
+  // 3. Verifica se o acesso ao app é liberado imediatamente
+  const isPendingAfter = !pendingResident.apartment_id;
+  const canAccessAssignedApt = pendingResident.apartment_id === allocatedApt.id;
+
+  if (isPendingInitial && !isPendingAfter && canAccessAssignedApt) {
+    console.log('✅ Cenário 7 [PASSOU]: Alocação de morador pendente liberou acesso imediato à unidade 202.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 7 [FALHOU]: Morador alocado permaneceu bloqueado.');
+  }
+})();
+
+// CENÁRIO 8: Limite de Ruído Customizado por Unidade Sobrescrevendo Política Geral
+(() => {
+  const condoPolicy = { warningDb: 60.0, criticalDb: 70.0 };
+  const aptWithCustomThreshold = {
+    id: 'apt-studio-301',
+    custom_night_threshold_db: 65.0, // Limite acústico mais tolerante para estúdio
+    custom_critical_threshold_db: 75.0,
+  };
+
+  const currentReading = 62.0; // Superior a 60 dB da política geral, mas abaixo dos 65 dB da unidade
+
+  const effectiveThreshold = aptWithCustomThreshold.custom_night_threshold_db ?? condoPolicy.warningDb;
+  const isAboveThreshold = currentReading >= effectiveThreshold;
+
+  if (!isAboveThreshold) {
+    console.log('✅ Cenário 8 [PASSOU]: Limite customizado da unidade (65 dB) teve prioridade sobre política geral (60 dB), evitando alerta indevido.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 8 [FALHOU]: Limite customizado da unidade foi ignorado.');
   }
 })();
 

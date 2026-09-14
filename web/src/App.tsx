@@ -62,9 +62,28 @@ export const App: React.FC = () => {
 
   // Se o perfil selecionado for Morador, renderiza o App Morador (Mobile View)
   if (role === 'resident') {
-    const residentApt = user?.apartment_id
+    let residentApt = user?.apartment_id
       ? apartments.find(a => a.id === user.apartment_id) || null
       : null;
+
+    // Se o morador já possui apartment_id alocado mas a lista geral ainda não o contém,
+    // sintetiza a unidade correspondente para que ele NUNCA fique bloqueado.
+    if (!residentApt && user?.apartment_id) {
+      residentApt = {
+        id: user.apartment_id,
+        building_id: '00000000-0000-0000-0000-000000000002',
+        number: user.apartment_number || 'Sua Unidade',
+        floor: 1,
+        current_db: 42.0,
+        status: 'normal',
+        peak_db: 45.0,
+        avg_db: 42.0,
+        custom_day_threshold_db: 70,
+        custom_night_threshold_db: 60,
+        custom_critical_threshold_db: 80,
+        created_at: user.created_at || new Date().toISOString(),
+      };
+    }
 
     return (
       <ResidentMobileView

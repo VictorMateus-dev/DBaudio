@@ -31,6 +31,14 @@ export const ResidentsManagementPage: React.FC = () => {
   const [editNightDb, setEditNightDb] = useState(60);
   const [editCritDb, setEditCritDb] = useState(80);
 
+  // Estados para Alocação Flexível (Unidade Existente ou Criação On-the-Fly)
+  const [allocationMode, setAllocationMode] = useState<'existing' | 'new'>('existing');
+  const [inlineAptNumber, setInlineAptNumber] = useState('');
+  const [inlineAptFloor, setInlineAptFloor] = useState(1);
+  const [inlineDayDb, setInlineDayDb] = useState(70);
+  const [inlineNightDb, setInlineNightDb] = useState(60);
+  const [inlineCritDb, setInlineCritDb] = useState(80);
+
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const loadData = async () => {
@@ -57,20 +65,50 @@ export const ResidentsManagementPage: React.FC = () => {
 
   const showFeedback = (type: 'success' | 'error', text: string) => {
     setFeedbackMsg({ type, text });
-    setTimeout(() => setFeedbackMsg(null), 4000);
+    setTimeout(() => setFeedbackMsg(null), 4500);
   };
 
   // Handlers for Resident Assignment
   const handleAssignApartment = async () => {
-    if (!allocatingProfile || !selectedApartmentId) return;
-    const ok = await DataService.assignResidentToApartment(allocatingProfile.id, selectedApartmentId);
-    if (ok) {
-      showFeedback('success', `Morador ${allocatingProfile.full_name} alocado com sucesso!`);
-      setAllocatingProfile(null);
-      setSelectedApartmentId('');
-      loadData();
+    if (!allocatingProfile) return;
+
+    if (allocationMode === 'existing') {
+      if (!selectedApartmentId) {
+        showFeedback('error', 'Por favor, selecione um apartamento da lista.');
+        return;
+      }
+      const ok = await DataService.assignResidentToApartment(allocatingProfile.id, selectedApartmentId);
+      if (ok) {
+        const targetApt = apartments.find(a => a.id === selectedApartmentId);
+        showFeedback('success', `Morador ${allocatingProfile.full_name} alocado ao Apartamento ${targetApt?.number || ''} com sucesso!`);
+        setAllocatingProfile(null);
+        setSelectedApartmentId('');
+        loadData();
+      } else {
+        showFeedback('error', 'Falha ao vincular morador ao apartamento. Verifique a conexão com o banco.');
+      }
     } else {
-      showFeedback('error', 'Falha ao vincular morador ao apartamento.');
+      if (!inlineAptNumber.trim()) {
+        showFeedback('error', 'Informe o número do apartamento a ser criado.');
+        return;
+      }
+      const res = await DataService.createAndAssignApartment(allocatingProfile.id, {
+        number: inlineAptNumber.trim(),
+        floor: Number(inlineAptFloor),
+        custom_day_threshold_db: Number(inlineDayDb),
+        custom_night_threshold_db: Number(inlineNightDb),
+        custom_critical_threshold_db: Number(inlineCritDb),
+      });
+
+      if (res.success) {
+        showFeedback('success', `Apartamento ${inlineAptNumber} criado e ${allocatingProfile.full_name} alocado com sucesso!`);
+        setAllocatingProfile(null);
+        setInlineAptNumber('');
+        setInlineAptFloor(1);
+        loadData();
+      } else {
+        showFeedback('error', res.message || 'Falha ao criar unidade e alocar morador.');
+      }
     }
   };
 
@@ -267,6 +305,7 @@ export const ResidentsManagementPage: React.FC = () => {
                   onClick={() => {
                     setAllocatingProfile(prof);
                     setSelectedApartmentId(apartments[0]?.id || '');
+                    setAllocationMode(apartments.length > 0 ? 'existing' : 'new');
                   }}
                   className="px-3 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-medium shadow-glow-purple shrink-0 transition flex items-center gap-1.5"
                 >
@@ -357,6 +396,20 @@ export const ResidentsManagementPage: React.FC = () => {
                             >
                               <History className="w-3.5 h-3.5" />
                               <span>Histórico</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAllocatingProfile(resident);
+                                setSelectedApartmentId(apartments.find(a => a.id !== resident.apartment_id)?.id || apartments[0]?.id || '');
+                                setAllocationMode('existing');
+                              }}
+                              title="Trocar morador de apartamento"
+                              className="px-2.5 py-1.5 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 border border-violet-500/20 transition text-[11px] flex items-center gap-1"
+                            >
+                              <Building2 className="w-3.5 h-3.5" />
+                              <span>Trocar Apto</span>
                             </button>
 
                             <button
@@ -474,7 +527,23 @@ export const ResidentsManagementPage: React.FC = () => {
                           {resident.full_name}
                         </span>
                       ) : (
-                        <span className="text-amber-400/90 italic font-medium">Unidade Vaga</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-amber-400/90 italic font-medium">Unidade Vaga</span>
+                          {pendingResidents.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAllocatingProfile(pendingResidents[0]);
+                                setSelectedApartmentId(apt.id);
+                                setAllocationMode('existing');
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-violet-600/30 hover:bg-violet-600 text-violet-200 hover:text-white text-[10px] font-semibold transition flex items-center gap-1 border border-violet-500/30 shadow-glow-purple"
+                            >
+                              <UserPlus className="w-3 h-3" />
+                              <span>Alocar</span>
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
 
@@ -532,7 +601,9 @@ export const ResidentsManagementPage: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
                 <Building2 className="w-5 h-5 text-violet-400" />
-                <h3 className="font-bold text-white text-base">Alocar Morador</h3>
+                <h3 className="font-bold text-white text-base">
+                  {allocatingProfile.apartment_id ? 'Trocar de Apartamento' : 'Alocar Morador'}
+                </h3>
               </div>
               <button
                 type="button"
@@ -545,24 +616,132 @@ export const ResidentsManagementPage: React.FC = () => {
 
             <div className="p-3.5 rounded-2xl bg-space-900/80 border border-white/5 space-y-1 text-xs">
               <div className="text-slate-400 font-medium">Morador selecionado:</div>
-              <div className="font-bold text-white text-sm">{allocatingProfile.full_name}</div>
+              <div className="font-bold text-white text-sm flex items-center justify-between">
+                <span>{allocatingProfile.full_name}</span>
+                {allocatingProfile.apartment_number && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-violet-500/20 text-violet-300">
+                    Atual: Apto {allocatingProfile.apartment_number}
+                  </span>
+                )}
+              </div>
               <div className="text-slate-400">{allocatingProfile.email}</div>
             </div>
 
-            <div className="space-y-2 text-xs">
-              <label className="text-slate-300 font-medium">Selecione a Unidade Residencial:</label>
-              <select
-                value={selectedApartmentId}
-                onChange={(e) => setSelectedApartmentId(e.target.value)}
-                className="w-full bg-space-900 border border-white/15 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-violet-500"
+            {/* Alternador de Modo: Unidade Existente vs Criar Nova */}
+            <div className="grid grid-cols-2 p-1 rounded-xl bg-space-900 border border-white/5 text-xs">
+              <button
+                type="button"
+                onClick={() => setAllocationMode('existing')}
+                disabled={apartments.length === 0}
+                className={`py-2 rounded-lg font-medium transition ${
+                  allocationMode === 'existing'
+                    ? 'bg-violet-600 text-white shadow-glow-purple'
+                    : apartments.length === 0
+                    ? 'text-slate-600 cursor-not-allowed'
+                    : 'text-slate-400 hover:text-white'
+                }`}
               >
-                {apartments.map((apt) => (
-                  <option key={apt.id} value={apt.id}>
-                    Apartamento {apt.number} (Andar {apt.floor || 1})
-                  </option>
-                ))}
-              </select>
+                Unidade Existente {apartments.length > 0 ? `(${apartments.length})` : '(0)'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAllocationMode('new')}
+                className={`py-2 rounded-lg font-medium transition ${
+                  allocationMode === 'new'
+                    ? 'bg-violet-600 text-white shadow-glow-purple'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                + Nova Unidade
+              </button>
             </div>
+
+            {/* MODO 1: SELECIONAR UNIDADE EXISTENTE */}
+            {allocationMode === 'existing' && (
+              <div className="space-y-3 text-xs animate-fadeIn">
+                {apartments.length === 0 ? (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+                    Nenhum apartamento cadastrado no condomínio. Clique na aba <strong>"+ Nova Unidade"</strong> acima para criar e alocar o morador no mesmo instante.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-slate-300 font-medium">Selecione a Unidade Residencial:</label>
+                    <select
+                      value={selectedApartmentId}
+                      onChange={(e) => setSelectedApartmentId(e.target.value)}
+                      className="w-full bg-space-900 border border-white/15 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-violet-500"
+                    >
+                      {apartments.map((apt) => (
+                        <option key={apt.id} value={apt.id}>
+                          Apartamento {apt.number} (Andar {apt.floor || 1}) — Limite Diurno {apt.custom_day_threshold_db ?? 70} dB
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* MODO 2: CRIAR NOVA UNIDADE E ALOCAR DIRETAMENTE */}
+            {allocationMode === 'new' && (
+              <div className="space-y-3 text-xs animate-fadeIn">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-300 font-medium block mb-1">Número do Apto:</label>
+                    <input
+                      type="text"
+                      value={inlineAptNumber}
+                      onChange={(e) => setInlineAptNumber(e.target.value)}
+                      placeholder="Ex: 101, 202, Cob 01"
+                      className="w-full bg-space-900 border border-white/15 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-300 font-medium block mb-1">Andar:</label>
+                    <input
+                      type="number"
+                      value={inlineAptFloor}
+                      onChange={(e) => setInlineAptFloor(Number(e.target.value))}
+                      min="1"
+                      className="w-full bg-space-900 border border-white/15 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                  <span className="text-[11px] font-semibold text-slate-300 block">Limites de Decibéis (dB SPL) desta Unidade:</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Diurno</label>
+                      <input
+                        type="number"
+                        value={inlineDayDb}
+                        onChange={(e) => setInlineDayDb(Number(e.target.value))}
+                        className="w-full bg-space-900 border border-white/10 rounded-lg px-2 py-1.5 text-center text-emerald-400 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Noturno</label>
+                      <input
+                        type="number"
+                        value={inlineNightDb}
+                        onChange={(e) => setInlineNightDb(Number(e.target.value))}
+                        className="w-full bg-space-900 border border-white/10 rounded-lg px-2 py-1.5 text-center text-amber-400 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Crítico</label>
+                      <input
+                        type="number"
+                        value={inlineCritDb}
+                        onChange={(e) => setInlineCritDb(Number(e.target.value))}
+                        className="w-full bg-space-900 border border-white/10 rounded-lg px-2 py-1.5 text-center text-red-400 font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
@@ -577,7 +756,7 @@ export const ResidentsManagementPage: React.FC = () => {
                 onClick={handleAssignApartment}
                 className="px-5 py-2.5 rounded-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-semibold shadow-glow-purple transition"
               >
-                Confirmar Alocação
+                {allocationMode === 'new' ? 'Criar e Alocar Morador' : 'Confirmar Alocação'}
               </button>
             </div>
           </div>

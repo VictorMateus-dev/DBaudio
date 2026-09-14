@@ -55,8 +55,24 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
     }
   }, [alerts]);
 
-  const currentDb = apartment?.current_db || 48.0;
-  const status = apartment?.status || 'normal';
+  // Unidade efetiva: caso apartment seja nulo, sintetiza com base nos dados do usuário alocado
+  const effectiveApt: Apartment = apartment || {
+    id: user?.apartment_id || 'unassigned',
+    building_id: '00000000-0000-0000-0000-000000000002',
+    number: user?.apartment_number || 'Sua Unidade',
+    floor: 1,
+    current_db: 42.0,
+    status: 'normal',
+    peak_db: 45.0,
+    avg_db: 42.0,
+    custom_day_threshold_db: 70,
+    custom_night_threshold_db: 60,
+    custom_critical_threshold_db: 80,
+    created_at: user?.created_at || new Date().toISOString(),
+  };
+
+  const currentDb = effectiveApt.current_db || 48.0;
+  const status = effectiveApt.status || 'normal';
 
   const handleDismissAlert = () => {
     if (activeModalAlert) {
@@ -73,9 +89,9 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
 
     const newOcc: Occurrence = {
       id: `occ-${Date.now()}`,
-      condominium_id: user?.condominium_id || 'c1',
+      condominium_id: user?.condominium_id || '00000000-0000-0000-0000-000000000001',
       reporter_id: isAnonymous ? undefined : user?.id,
-      apartment_id: apartment?.id,
+      apartment_id: effectiveApt.id,
       type: newType,
       location: newLocation,
       description: newDesc.trim(),
@@ -99,7 +115,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   };
 
   // TELA DE ESPERA: Quando o morador confirmou e-mail mas ainda não foi alocado a um apartamento
-  if (!apartment || !user?.apartment_id) {
+  if (!user?.apartment_id) {
     return (
       <div className="min-h-screen bg-space-950 p-4 md:p-8 flex flex-col items-center justify-center relative overflow-hidden">
         {/* Atmospheric Glow */}
@@ -179,7 +195,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
       <div className="w-full max-w-md mb-4 flex items-center justify-between text-xs text-slate-400 px-2">
         <div className="flex items-center space-x-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="text-white font-medium">App Morador (Apto {apartment.number})</span>
+          <span className="text-white font-medium">App Morador (Apto {effectiveApt.number})</span>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -215,8 +231,8 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
         {/* App Top Bar */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-4 px-2">
           <div>
-            <h2 className="text-base font-bold text-white tracking-tight">Olá, {user?.full_name || 'João Silva'}</h2>
-            <p className="text-xs text-slate-400">Meu apartamento: <strong className="text-blue-400 font-mono">101</strong> • Bloco A</p>
+            <h2 className="text-base font-bold text-white tracking-tight">Olá, {user?.full_name || 'Morador'}</h2>
+            <p className="text-xs text-slate-400">Meu apartamento: <strong className="text-violet-400 font-mono">{effectiveApt.number}</strong> • Bloco Principal</p>
           </div>
 
           <div className="flex items-center space-x-1.5 bg-slate-800 px-2.5 py-1 rounded-full text-[11px] text-emerald-400 font-medium">
@@ -265,11 +281,11 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-xs">
                   <span className="text-slate-400 block mb-1">Média 24h</span>
-                  <span className="text-lg font-bold text-white font-mono">{apartment.avg_db?.toFixed(1) || '46.5'} dB</span>
+                  <span className="text-lg font-bold text-white font-mono">{effectiveApt.avg_db?.toFixed(1) || '46.5'} dB</span>
                 </div>
                 <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-xs">
                   <span className="text-slate-400 block mb-1">Último Pico</span>
-                  <span className="text-lg font-bold text-amber-400 font-mono">{apartment.peak_db?.toFixed(1) || '68.2'} dB</span>
+                  <span className="text-lg font-bold text-amber-400 font-mono">{effectiveApt.peak_db?.toFixed(1) || '68.2'} dB</span>
                 </div>
               </div>
 
@@ -304,15 +320,15 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
 
           {activeTab === 'history' && (
             <div className="space-y-3">
-              <span className="text-xs font-bold text-white block">Histórico de Ruído da Unidade 101</span>
+              <span className="text-xs font-bold text-white block">Histórico de Ruído da Unidade {effectiveApt.number}</span>
               <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 text-xs space-y-3">
                 <div className="flex justify-between text-slate-400">
                   <span>Pico Máximo Registrado</span>
-                  <strong className="text-amber-400 font-mono">{apartment.peak_db?.toFixed(1) || '84.5'} dB</strong>
+                  <strong className="text-amber-400 font-mono">{effectiveApt.peak_db?.toFixed(1) || '84.5'} dB</strong>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Média das últimas 24h</span>
-                  <strong className="text-blue-400 font-mono">{apartment.avg_db?.toFixed(1) || '46.5'} dB</strong>
+                  <strong className="text-blue-400 font-mono">{effectiveApt.avg_db?.toFixed(1) || '46.5'} dB</strong>
                 </div>
               </div>
 
@@ -410,12 +426,12 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
           {activeTab === 'profile' && (
             <div className="space-y-4 text-xs">
               <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-5 text-center">
-                <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto mb-2 text-xl font-bold">
-                  JS
+                <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center mx-auto mb-2 text-xl font-bold shadow-glow-purple">
+                  {(user?.full_name || 'MO').slice(0, 2).toUpperCase()}
                 </div>
-                <h3 className="font-bold text-white text-base">João Silva</h3>
-                <p className="text-slate-400">Unidade 101 • Bloco A</p>
-                <p className="text-slate-500 text-[11px]">morador101@dbsound.com</p>
+                <h3 className="font-bold text-white text-base">{user?.full_name || 'Morador'}</h3>
+                <p className="text-slate-400">Unidade {effectiveApt.number} • Bloco Principal</p>
+                <p className="text-slate-500 text-[11px]">{user?.email || 'morador@dbsound.com'}</p>
               </div>
 
               <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-2">

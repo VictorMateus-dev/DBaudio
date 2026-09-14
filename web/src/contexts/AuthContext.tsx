@@ -57,23 +57,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const isPendingAssignment = Boolean(user && user.role === 'resident' && !user.apartment_id);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, authUserEmail?: string, authUserFullName?: string) => {
     if (isSupabaseConfigured && supabase) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*, apartments(number)')
-        .eq('id', userId)
-        .single();
+      try {
+        // 1. Tenta carregar perfil completo com join em apartments
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*, apartments(number)')
+          .eq('id', userId)
+          .maybeSingle();
 
-      if (data) {
-        const prof: Profile = {
-          ...data,
-          apartment_number: data.apartments?.number || undefined,
-        };
-        setUser(prof);
-        setRole(prof.role);
-        setIsDemoMode(false);
-        return;
+        if (!error && data) {
+          const prof: Profile = {
+            ...data,
+            apartment_number: data.apartments?.number || undefined,
+          };
+          setUser(prof);
+          setRole(prof.role);
+          setIsDemoMode(false);
+          return;
+        }
+
+        // 2. Se join falhar, tenta consulta direta em profiles
+        const { data: rawData, error: rawError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (!rawError && rawData) {
+          let aptNumber: string | undefined = undefined;
+          if (rawData.apartment_id) {
+            const { data: aptData } = await supabase
+              .from('apartments')
+              .select('number')
+              .eq('id', rawData.apartment_id)
+              .maybeSingle();
+            if (aptData?.number) aptNumber = aptData.number;
+          }
+
+          const prof: Profile = {
+            ...rawData,
+            apartment_number: aptNumber,
+          };
+          setUser(prof);
+          setRole(prof.role);
+          setIsDemoMode(false);
+          return;
+        }
+
+        // 3. Se o perfil não existir (ex: falha no trigger), auto-recupera via RPC
+        if (authUserEmail) {
+          const { data: rpcData, error: rpcError } = await supabase.rpc('get_or_create_profile', {
+            p_user_id: userId,
+            p_email: authUserEmail,
+            p_full_name: authUserFullName || null,
+          });
+
+          if (!rpcError && rpcData?.success && rpcData.profile) {
+            const prof = rpcData.profile as Profile;
+            setUser(prof);
+            setRole(prof.role);
+            setIsDemoMode(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar perfil do Supabase:', err);
       }
     }
 
@@ -87,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id);
+      await fetchProfile(user.id, user.email, user.full_name);
     }
   };
 
@@ -96,13 +146,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isSupabaseConfigured && client) {
       client.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
-          fetchProfile(session.user.id);
+          fetchProfile(session.user.id, session.user.email, session.user.user_metadata?.full_name);
         }
       });
 
       const { data: authListener } = client.auth.onAuthStateChange(async (_event, session) => {
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          await fetchProfile(session.user.id, session.user.email, session.user.user_metadata?.full_name);
         } else {
           setUser(null);
         }
@@ -136,7 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (data.user) {
-          await fetchProfile(data.user.id);
+          await fetchProfile(data.user.id, data.user.email, data.user.user_metadata?.full_name);
           return { success: true };
         }
       }
@@ -199,7 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (authData.user) {
-          await fetchProfile(authData.user.id);
+          await fetchProfile(authData.user.id, authData.user.email, data.fullName);
           return {
             success: true,
             needsConfirmation: false,
@@ -215,7 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: data.email,
         phone: data.phone,
         role: 'resident',
-        condominium_id: 'c1',
+        condominium_id: '00000000-0000-0000-0000-000000000001',
         apartment_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

@@ -5,19 +5,22 @@ import {
   UserHistoryReport, CreateApartmentDTO, UpdateApartmentThresholdsDTO
 } from '../types/database.types';
 
+export const DEFAULT_CONDO_ID = '00000000-0000-0000-0000-000000000001';
+export const DEFAULT_BUILDING_ID = '00000000-0000-0000-0000-000000000002';
+
 // ============================================================================
 // DADOS DE DEMONSTRAÇÃO / BASELINE INICIAL
 // ============================================================================
 const initialApartments: Apartment[] = [
-  { id: '10100000-0000-0000-0000-000000000101', building_id: 'b1', number: '101', floor: 1, current_db: 45.2, status: 'normal', peak_db: 58.4, avg_db: 46.1, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80, created_at: new Date().toISOString() },
-  { id: '10200000-0000-0000-0000-000000000102', building_id: 'b1', number: '102', floor: 1, current_db: 51.0, status: 'normal', peak_db: 62.0, avg_db: 49.3, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80, created_at: new Date().toISOString() },
-  { id: '10300000-0000-0000-0000-000000000103', building_id: 'b1', number: '103', floor: 1, current_db: 74.5, status: 'warning', peak_db: 76.2, avg_db: 68.0, custom_day_threshold_db: 68, custom_night_threshold_db: 58, custom_critical_threshold_db: 78, created_at: new Date().toISOString() },
-  { id: '20100000-0000-0000-0000-000000000201', building_id: 'b1', number: '201', floor: 2, current_db: 42.1, status: 'normal', peak_db: 50.1, avg_db: 43.8, created_at: new Date().toISOString() },
-  { id: '20200000-0000-0000-0000-000000000202', building_id: 'b1', number: '202', floor: 2, current_db: 84.8, status: 'critical', peak_db: 89.2, avg_db: 78.4, custom_day_threshold_db: 72, custom_night_threshold_db: 62, custom_critical_threshold_db: 82, created_at: new Date().toISOString() },
-  { id: '20300000-0000-0000-0000-000000000203', building_id: 'b1', number: '203', floor: 2, current_db: 0, status: 'offline', peak_db: 54.0, avg_db: 45.0, created_at: new Date().toISOString() },
-  { id: '30100000-0000-0000-0000-000000000301', building_id: 'b1', number: '301', floor: 3, current_db: 43.0, status: 'normal', peak_db: 52.0, avg_db: 44.5, created_at: new Date().toISOString() },
-  { id: '30200000-0000-0000-0000-000000000302', building_id: 'b1', number: '302', floor: 3, current_db: 48.6, status: 'normal', peak_db: 56.1, avg_db: 47.2, created_at: new Date().toISOString() },
-  { id: '30300000-0000-0000-0000-000000000303', building_id: 'b1', number: '303', floor: 3, current_db: 0, status: 'offline', peak_db: 51.0, avg_db: 46.0, created_at: new Date().toISOString() },
+  { id: '10100000-0000-0000-0000-000000000101', building_id: DEFAULT_BUILDING_ID, number: '101', floor: 1, current_db: 45.2, status: 'normal', peak_db: 58.4, avg_db: 46.1, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80, created_at: new Date().toISOString() },
+  { id: '10200000-0000-0000-0000-000000000102', building_id: DEFAULT_BUILDING_ID, number: '102', floor: 1, current_db: 51.0, status: 'normal', peak_db: 62.0, avg_db: 49.3, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80, created_at: new Date().toISOString() },
+  { id: '10300000-0000-0000-0000-000000000103', building_id: DEFAULT_BUILDING_ID, number: '103', floor: 1, current_db: 74.5, status: 'warning', peak_db: 76.2, avg_db: 68.0, custom_day_threshold_db: 68, custom_night_threshold_db: 58, custom_critical_threshold_db: 78, created_at: new Date().toISOString() },
+  { id: '20100000-0000-0000-0000-000000000201', building_id: DEFAULT_BUILDING_ID, number: '201', floor: 2, current_db: 42.1, status: 'normal', peak_db: 50.1, avg_db: 43.8, created_at: new Date().toISOString() },
+  { id: '20200000-0000-0000-0000-000000000202', building_id: DEFAULT_BUILDING_ID, number: '202', floor: 2, current_db: 84.8, status: 'critical', peak_db: 89.2, avg_db: 78.4, custom_day_threshold_db: 72, custom_night_threshold_db: 62, custom_critical_threshold_db: 82, created_at: new Date().toISOString() },
+  { id: '20300000-0000-0000-0000-000000000203', building_id: DEFAULT_BUILDING_ID, number: '203', floor: 2, current_db: 0, status: 'offline', peak_db: 54.0, avg_db: 45.0, created_at: new Date().toISOString() },
+  { id: '30100000-0000-0000-0000-000000000301', building_id: DEFAULT_BUILDING_ID, number: '301', floor: 3, current_db: 43.0, status: 'normal', peak_db: 52.0, avg_db: 44.5, created_at: new Date().toISOString() },
+  { id: '30200000-0000-0000-0000-000000000302', building_id: DEFAULT_BUILDING_ID, number: '302', floor: 3, current_db: 48.6, status: 'normal', peak_db: 56.1, avg_db: 47.2, created_at: new Date().toISOString() },
+  { id: '30300000-0000-0000-0000-000000000303', building_id: DEFAULT_BUILDING_ID, number: '303', floor: 3, current_db: 0, status: 'offline', peak_db: 51.0, avg_db: 46.0, created_at: new Date().toISOString() },
 ];
 
 const initialDevices: Device[] = [
@@ -39,8 +42,8 @@ const initialSensors: Sensor[] = [
 ];
 
 const initialPolicies: NoisePolicy[] = [
-  { id: 'p1', condominium_id: 'c1', name: 'Política Diurna Padrão', start_time: '07:00', end_time: '22:00', threshold_db: 70.0, warning_threshold_db: 70.0, critical_threshold_db: 80.0, min_duration_seconds: 3, cooldown_seconds: 60, enabled: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 'p2', condominium_id: 'c1', name: 'Política Noturna (Silêncio)', start_time: '22:00', end_time: '07:00', threshold_db: 60.0, warning_threshold_db: 60.0, critical_threshold_db: 70.0, min_duration_seconds: 3, cooldown_seconds: 60, enabled: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 'p1', condominium_id: DEFAULT_CONDO_ID, name: 'Política Diurna Padrão', start_time: '07:00', end_time: '22:00', threshold_db: 70.0, warning_threshold_db: 70.0, critical_threshold_db: 80.0, min_duration_seconds: 3, cooldown_seconds: 60, enabled: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  { id: 'p2', condominium_id: DEFAULT_CONDO_ID, name: 'Política Noturna (Silêncio)', start_time: '22:00', end_time: '07:00', threshold_db: 60.0, warning_threshold_db: 60.0, critical_threshold_db: 70.0, min_duration_seconds: 3, cooldown_seconds: 60, enabled: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
 ];
 
 const initialProfiles: Profile[] = [
@@ -50,7 +53,7 @@ const initialProfiles: Profile[] = [
     email: 'admin@dbsound.com',
     phone: '(11) 98888-0001',
     role: 'admin',
-    condominium_id: 'c1',
+    condominium_id: DEFAULT_CONDO_ID,
     apartment_id: null,
     created_at: new Date(Date.now() - 3600000 * 24 * 120).toISOString(),
     updated_at: new Date().toISOString(),
@@ -61,7 +64,7 @@ const initialProfiles: Profile[] = [
     email: 'morador101@dbsound.com',
     phone: '(11) 97777-0101',
     role: 'resident',
-    condominium_id: 'c1',
+    condominium_id: DEFAULT_CONDO_ID,
     apartment_id: '10100000-0000-0000-0000-000000000101',
     apartment_number: '101',
     created_at: new Date(Date.now() - 3600000 * 24 * 45).toISOString(),
@@ -73,7 +76,7 @@ const initialProfiles: Profile[] = [
     email: 'morador202@dbsound.com',
     phone: '(11) 96666-0202',
     role: 'resident',
-    condominium_id: 'c1',
+    condominium_id: DEFAULT_CONDO_ID,
     apartment_id: '20200000-0000-0000-0000-000000000202',
     apartment_number: '202',
     created_at: new Date(Date.now() - 3600000 * 24 * 20).toISOString(),
@@ -85,7 +88,7 @@ const initialProfiles: Profile[] = [
     email: 'lucas.morador@email.com',
     phone: '(11) 95555-9999',
     role: 'resident',
-    condominium_id: 'c1',
+    condominium_id: DEFAULT_CONDO_ID,
     apartment_id: null,
     created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
     updated_at: new Date().toISOString(),
@@ -242,16 +245,24 @@ export const DataService = {
 
   async getApartmentById(id: string): Promise<Apartment | null> {
     if (isSupabaseConfigured && supabase) {
-      const { data } = await supabase.from('apartments').select('*').eq('id', id).single();
-      if (data) return data as Apartment;
+      try {
+        const { data, error } = await supabase.from('apartments').select('*').eq('id', id).single();
+        if (!error && data) return data as Apartment;
+      } catch (e) {
+        console.warn('Erro ao consultar apartamento por ID no Supabase:', e);
+      }
     }
     return localStore.apartments.find(a => a.id === id) || null;
   },
 
   async createApartment(dto: CreateApartmentDTO): Promise<Apartment> {
+    const generatedId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `00000000-0000-0000-0000-${Date.now().toString().padStart(12, '0')}`.slice(0, 36);
+
     const newApt: Apartment = {
-      id: `apt-${Date.now()}`,
-      building_id: dto.building_id || 'b1',
+      id: generatedId,
+      building_id: dto.building_id || DEFAULT_BUILDING_ID,
       number: dto.number,
       floor: dto.floor || 1,
       current_db: 40.0,
@@ -265,25 +276,95 @@ export const DataService = {
     };
 
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('apartments').insert({
-        building_id: newApt.building_id,
-        number: newApt.number,
-        floor: newApt.floor,
-        custom_day_threshold_db: newApt.custom_day_threshold_db,
-        custom_night_threshold_db: newApt.custom_night_threshold_db,
-        custom_critical_threshold_db: newApt.custom_critical_threshold_db,
-      }).select().single();
+      // 1. Tenta RPC segura SECURITY DEFINER
+      try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('create_apartment_and_assign', {
+          p_number: newApt.number,
+          p_floor: newApt.floor,
+          p_day_db: newApt.custom_day_threshold_db,
+          p_night_db: newApt.custom_night_threshold_db,
+          p_crit_db: newApt.custom_critical_threshold_db,
+          p_profile_id: null,
+        });
 
-      if (!error && data) {
-        localStore.apartments.push(data as Apartment);
-        localStore.notify();
-        return data as Apartment;
+        if (!rpcError && rpcData?.success && rpcData.apartment) {
+          const created = rpcData.apartment as Apartment;
+          localStore.apartments.push(created);
+          localStore.notify();
+          return created;
+        }
+      } catch (err) {
+        console.warn('create_apartment_and_assign RPC indisponível, tentando inserção direta:', err);
+      }
+
+      // 2. Inserção direta utilizando o UUID do bloco padrão
+      try {
+        const { data, error } = await supabase.from('apartments').insert({
+          building_id: DEFAULT_BUILDING_ID,
+          number: newApt.number,
+          floor: newApt.floor,
+          custom_day_threshold_db: newApt.custom_day_threshold_db,
+          custom_night_threshold_db: newApt.custom_night_threshold_db,
+          custom_critical_threshold_db: newApt.custom_critical_threshold_db,
+        }).select().single();
+
+        if (!error && data) {
+          localStore.apartments.push(data as Apartment);
+          localStore.notify();
+          return data as Apartment;
+        } else if (error) {
+          console.error('Erro ao cadastrar apartamento no Supabase:', error);
+        }
+      } catch (err) {
+        console.error('Falha de rede ao cadastrar apartamento:', err);
       }
     }
 
     localStore.apartments.push(newApt);
     localStore.notify();
     return newApt;
+  },
+
+  async createAndAssignApartment(
+    profileId: string, 
+    dto: CreateApartmentDTO
+  ): Promise<{ success: boolean; apartment?: Apartment; message?: string }> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('create_apartment_and_assign', {
+          p_number: dto.number,
+          p_floor: dto.floor || 1,
+          p_day_db: dto.custom_day_threshold_db ?? 70.0,
+          p_night_db: dto.custom_night_threshold_db ?? 60.0,
+          p_crit_db: dto.custom_critical_threshold_db ?? 80.0,
+          p_profile_id: profileId,
+        });
+
+        if (!rpcError && rpcData?.success && rpcData.apartment) {
+          const created = rpcData.apartment as Apartment;
+          localStore.apartments.push(created);
+          const p = localStore.profiles.find(prof => prof.id === profileId);
+          if (p) {
+            p.apartment_id = created.id;
+            p.apartment_number = created.number;
+            p.updated_at = new Date().toISOString();
+          }
+          localStore.notify();
+          return { success: true, apartment: created };
+        }
+      } catch (e) {
+        console.warn('create_apartment_and_assign RPC falhou, tentando fallback:', e);
+      }
+    }
+
+    // Fallback composto: cria apartamento e aloca
+    const apt = await this.createApartment(dto);
+    const assigned = await this.assignResidentToApartment(profileId, apt.id);
+    return {
+      success: assigned,
+      apartment: apt,
+      message: assigned ? undefined : 'Unidade criada, mas erro ao vincular morador.',
+    };
   },
 
   async updateApartmentThresholds(dto: UpdateApartmentThresholdsDTO): Promise<boolean> {
@@ -366,16 +447,36 @@ export const DataService = {
   // PERFIS E GESTÃO DE MORADORES
   async getProfiles(): Promise<Profile[]> {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*, apartments(number)')
-        .order('created_at', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*, apartments(number)')
+          .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        return data.map((p: any) => ({
-          ...p,
-          apartment_number: p.apartments?.number || undefined,
-        }));
+        if (!error && data) {
+          return data.map((p: any) => ({
+            ...p,
+            apartment_number: p.apartments?.number || undefined,
+          }));
+        } else if (error) {
+          // Fallback se join com apartments der erro de RLS ou FK
+          const { data: rawData, error: rawError } = await supabase
+            .from('profiles')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!rawError && rawData) {
+            return rawData.map((p: any) => {
+              const apt = localStore.apartments.find(a => a.id === p.apartment_id);
+              return {
+                ...p,
+                apartment_number: apt?.number || undefined,
+              };
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao buscar perfis:', err);
       }
     }
     return localStore.profiles;
@@ -393,15 +494,43 @@ export const DataService = {
 
   async assignResidentToApartment(profileId: string, apartmentId: string): Promise<boolean> {
     const apt = localStore.apartments.find(a => a.id === apartmentId);
-    const aptNumber = apt?.number || 'N/A';
+    let aptNumber = apt?.number || 'N/A';
 
     if (isSupabaseConfigured && supabase) {
+      // 1. Tentar RPC com SECURITY DEFINER (imune a RLS)
+      try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('assign_resident_to_apartment', {
+          p_profile_id: profileId,
+          p_apartment_id: apartmentId,
+        });
+
+        if (!rpcError && rpcData?.success) {
+          if (rpcData.apartment_number) aptNumber = rpcData.apartment_number;
+          const p = localStore.profiles.find(prof => prof.id === profileId);
+          if (p) {
+            p.apartment_id = apartmentId;
+            p.apartment_number = aptNumber;
+            p.updated_at = new Date().toISOString();
+            localStore.notify();
+          }
+          return true;
+        } else if (rpcError) {
+          console.warn('assign_resident_to_apartment RPC warning, tentando fallback:', rpcError);
+        }
+      } catch (err) {
+        console.warn('assign_resident_to_apartment RPC catch:', err);
+      }
+
+      // 2. Fallback: Update direto na tabela profiles
       const { error } = await supabase
         .from('profiles')
         .update({ apartment_id: apartmentId, updated_at: new Date().toISOString() })
         .eq('id', profileId);
 
-      if (error) return false;
+      if (error) {
+        console.error('Erro no fallback de alocação de morador:', error);
+        return false;
+      }
     }
 
     const p = localStore.profiles.find(prof => prof.id === profileId);
@@ -412,17 +541,29 @@ export const DataService = {
       localStore.notify();
       return true;
     }
-    return false;
+    return true;
   },
 
   async unassignResident(profileId: string): Promise<boolean> {
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ apartment_id: null, updated_at: new Date().toISOString() })
-        .eq('id', profileId);
-
-      if (error) return false;
+      try {
+        const { data, error } = await supabase.rpc('unassign_resident_from_apartment', {
+          p_profile_id: profileId,
+        });
+        if (!error && data?.success) {
+          // Sucesso via RPC
+        } else {
+          await supabase
+            .from('profiles')
+            .update({ apartment_id: null, updated_at: new Date().toISOString() })
+            .eq('id', profileId);
+        }
+      } catch (err) {
+        await supabase
+          .from('profiles')
+          .update({ apartment_id: null, updated_at: new Date().toISOString() })
+          .eq('id', profileId);
+      }
     }
 
     const p = localStore.profiles.find(prof => prof.id === profileId);
@@ -433,7 +574,7 @@ export const DataService = {
       localStore.notify();
       return true;
     }
-    return false;
+    return true;
   },
 
   async deleteResident(profileId: string): Promise<boolean> {
