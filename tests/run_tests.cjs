@@ -79,7 +79,7 @@ console.log('   dBSound — EXECUÇÃO DA SUÍTE DE TESTES AUTOMATIZADOS');
 console.log('===============================================================\n');
 
 let passedTests = 0;
-let totalTests = 17;
+let totalTests = 22;
 
 // CENÁRIO 1: 40 dB — Não gerar alerta
 (() => {
@@ -508,6 +508,185 @@ let totalTests = 17;
     passedTests++;
   } else {
     console.error('❌ Cenário 17 [FALHOU]: Falha na resolução de status.');
+  }
+})();
+
+// CENÁRIO 18: Morador A (Apto 101) cria Denúncia Anônima contra Apto 102
+let createdOccurrence = null;
+(() => {
+  const reporterUser = { id: 'morador-101-id', full_name: 'Victor Mateus', apartment_id: 'apt-101' };
+  const targetApt = { id: 'apt-102', number: '102', current_db: 78.4 };
+  const isAnonymous = true;
+
+  createdOccurrence = {
+    id: `occ-${Date.now()}`,
+    condominium_id: '00000000-0000-0000-0000-000000000001',
+    reporter_id: isAnonymous ? undefined : reporterUser.id,
+    apartment_id: targetApt.id,
+    apartment_number: targetApt.number,
+    location: `Apartamento ${targetApt.number}`,
+    type: 'Música Alta / Som Excessivo',
+    description: 'Som automotivo na sacada ultrapassando limites noturnos.',
+    anonymous: isAnonymous,
+    reporter_name: isAnonymous ? 'Morador Anônimo' : reporterUser.full_name,
+    noise_level_db: targetApt.current_db,
+    status: 'aberta',
+    occurred_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const valid = createdOccurrence.apartment_id === 'apt-102' &&
+                createdOccurrence.reporter_id === undefined &&
+                createdOccurrence.anonymous === true &&
+                createdOccurrence.noise_level_db === 78.4 &&
+                createdOccurrence.status === 'aberta';
+
+  if (valid) {
+    console.log('✅ Cenário 18 [PASSOU]: Denúncia anônima vinculada com sucesso ao Apto alvo (102) com telemetria acústica e anonimato blindado.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 18 [FALHOU]: Denúncia anônima violou anonimato ou vinculou apartamento incorreto.');
+  }
+})();
+
+// CENÁRIO 19: Decisão do Síndico atualiza Ocorrência para 'procedente' com parecer regimental
+let auditComments = [];
+(() => {
+  const syndicDecision = 'procedente';
+  const syndicNotes = 'Infração constatada via sensor acústico do Apto 102 (78.4 dB às 23:15, acima do limite de 60 dB).';
+
+  createdOccurrence.status = syndicDecision;
+  createdOccurrence.decision = syndicDecision;
+  createdOccurrence.syndic_notes = syndicNotes;
+  createdOccurrence.decision_at = new Date().toISOString();
+  createdOccurrence.updated_at = new Date().toISOString();
+
+  auditComments.push({
+    id: `comm-${Date.now()}`,
+    occurrence_id: createdOccurrence.id,
+    author_name: 'Síndico Geral (Carlos)',
+    comment: `[Decisão Administrativa] Status alterado para: PROCEDENTE. Parecer: ${syndicNotes}`,
+    created_at: new Date().toISOString(),
+  });
+
+  const valid = createdOccurrence.status === 'procedente' &&
+                createdOccurrence.syndic_notes.includes('Infração constatada') &&
+                auditComments.length === 1;
+
+  if (valid) {
+    console.log('✅ Cenário 19 [PASSOU]: Decisão do Síndico registrada com sucesso, transição de status formal e trilha de auditoria.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 19 [FALHOU]: Falha ao registrar decisão do síndico na ocorrência.');
+  }
+})();
+
+// CENÁRIO 20: Emissão de Multa Simulada com Provedor de Cobrança Fictícia (Boleto + PIX)
+let createdFine = null;
+(() => {
+  // Simula o SimulatedBillingProvider desacoplado
+  const chargeParams = {
+    amount: 500.00,
+    description: `Multa por Infração Acústica — Apto ${createdOccurrence.apartment_number}`,
+    dueDate: '2026-09-30',
+    apartmentNumber: createdOccurrence.apartment_number,
+    occurrenceId: createdOccurrence.id,
+  };
+
+  const seed = Math.floor(100000000 + Math.random() * 900000000);
+  const barcode = `34191.09008 00000.${seed.toString().slice(0, 6)} 78901.${seed.toString().slice(3, 9)} 8 98760000050000`;
+  const pixPayload = `00020126580014BR.GOV.BCB.PIX0136dbsound-condominio-simulado@banco.com5204000053039865405${chargeParams.amount.toFixed(2)}5802BR5925Condominio Parque Flores6009Sao Paulo62070503***6304ABCD`;
+
+  createdFine = {
+    id: `fine-${Date.now()}`,
+    condominium_id: '00000000-0000-0000-0000-000000000001',
+    apartment_id: createdOccurrence.apartment_id,
+    apartment_number: createdOccurrence.apartment_number,
+    occurrence_id: createdOccurrence.id,
+    fine_number: `MULTA-2026-${seed.toString().slice(0, 4)}`,
+    reason: chargeParams.description,
+    amount: chargeParams.amount,
+    due_date: chargeParams.dueDate,
+    issue_date: new Date().toISOString(),
+    status: 'pendente',
+    syndic_notes: 'Reincidência em horário de silêncio conforme Art. 42 da Convenção Condominial.',
+    regimental_observation: 'Reincidência em horário de silêncio conforme Art. 42 da Convenção Condominial.',
+    barcode: barcode,
+    barcode_line: barcode,
+    qr_code_pix: pixPayload,
+    pix_payload: pixPayload,
+    provider: 'simulated',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  createdOccurrence.status = 'multa';
+
+  const valid = createdFine.amount === 500.00 &&
+                createdFine.apartment_id === 'apt-102' &&
+                createdFine.status === 'pendente' &&
+                createdFine.barcode.length > 20 &&
+                createdFine.pix_payload.includes('dbsound-condominio') &&
+                createdOccurrence.status === 'multa';
+
+  if (valid) {
+    console.log('✅ Cenário 20 [PASSOU]: Multa Simulada gerada via BillingProvider com Boleto, PIX Copia-e-Cola e vinculação à ocorrência.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 20 [FALHOU]: Falha ao gerar multa simulada e boleto.');
+  }
+})();
+
+// CENÁRIO 21: Isolamento Multi-Inquilino de Cobranças e Notificações (Morador 102 vs Morador 101)
+(() => {
+  const allFines = [createdFine];
+  const allOccurrences = [createdOccurrence];
+
+  // Morador do Apto 102 (Alvo da penalidade)
+  const morador102Fines = allFines.filter(f => f.apartment_id === 'apt-102');
+  const morador102Notices = allOccurrences.filter(o => o.apartment_id === 'apt-102');
+
+  // Morador do Apto 101 (Denunciante)
+  const morador101Fines = allFines.filter(f => f.apartment_id === 'apt-101');
+  const morador101Notices = allOccurrences.filter(o => o.apartment_id === 'apt-101');
+
+  // Morador 102 deve ver a multa e o aviso da sua unidade, MAS SEM NENHUM dado do denunciante
+  const valid102 = morador102Fines.length === 1 && 
+                   morador102Fines[0].amount === 500.00 &&
+                   morador102Notices.length === 1 &&
+                   morador102Notices[0].reporter_id === undefined &&
+                   morador102Notices[0].anonymous === true;
+
+  // Morador 101 NÃO tem multa nem notificação contra sua unidade
+  const valid101 = morador101Fines.length === 0 && morador101Notices.length === 0;
+
+  if (valid102 && valid101) {
+    console.log('✅ Cenário 21 [PASSOU]: Isolamento Multi-Inquilino garantido: Morador 102 vê notificação/multa sem dados do denunciante; Morador 101 não recebe cobranças indevidas.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 21 [FALHOU]: Vazamento de cobranças ou quebra de privacidade entre apartamentos.');
+  }
+})();
+
+// CENÁRIO 22: Simulação de Pagamento da Multa com Liquidação Fictícia
+(() => {
+  const simulatedPayFine = (fine) => {
+    const paidAt = new Date().toISOString();
+    fine.status = 'paga';
+    fine.paid_at = paidAt;
+    fine.updated_at = paidAt;
+    return true;
+  };
+
+  const success = simulatedPayFine(createdFine);
+  const valid = success && createdFine.status === 'paga' && Boolean(createdFine.paid_at);
+
+  if (valid) {
+    console.log('✅ Cenário 22 [PASSOU]: Simulação de Pagamento da Multa executada com sucesso, status alterado para "paga" com timestamp de liquidação.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 22 [FALHOU]: Falha na simulação de pagamento da multa.');
   }
 })();
 

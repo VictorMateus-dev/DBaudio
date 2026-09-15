@@ -628,7 +628,78 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ---------------------------------------------------------------------
--- 13. PERMISSÕES DE ACESSO TOTAIS
+-- 13. OCORRÊNCIAS, DENÚNCIAS E MULTAS SIMULADAS
+-- ---------------------------------------------------------------------
+
+-- Atualizar colunas de ocorrências
+ALTER TABLE public.occurrences 
+    ADD COLUMN IF NOT EXISTS apartment_number TEXT,
+    ADD COLUMN IF NOT EXISTS syndic_notes TEXT,
+    ADD COLUMN IF NOT EXISTS decision TEXT,
+    ADD COLUMN IF NOT EXISTS decision_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS noise_level_db NUMERIC(5, 2);
+
+-- Atualiza a restrição de status de ocorrências se existir
+DO $$ 
+BEGIN
+    ALTER TABLE public.occurrences DROP CONSTRAINT IF EXISTS occurrences_status_check;
+    ALTER TABLE public.occurrences ADD CONSTRAINT occurrences_status_check 
+        CHECK (status IN ('aberta', 'em análise', 'procedente', 'improcedente', 'advertência', 'multa', 'resolvida', 'cancelada'));
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END $$;
+
+-- Tabela de Multas / Cobranças Simuladas
+CREATE TABLE IF NOT EXISTS public.fines (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    condominium_id UUID NOT NULL REFERENCES public.condominiums(id) ON DELETE CASCADE,
+    apartment_id UUID NOT NULL REFERENCES public.apartments(id) ON DELETE CASCADE,
+    occurrence_id UUID REFERENCES public.occurrences(id) ON DELETE SET NULL,
+    fine_number TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    amount NUMERIC(10, 2) NOT NULL DEFAULT 500.00,
+    due_date DATE NOT NULL,
+    issue_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    status TEXT NOT NULL CHECK (status IN ('pendente', 'paga', 'vencida', 'cancelada')) DEFAULT 'pendente',
+    syndic_notes TEXT,
+    barcode TEXT,
+    qr_code_pix TEXT,
+    provider TEXT NOT NULL DEFAULT 'simulated',
+    paid_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Habilita e configura RLS para ocorrências, comentários e multas
+ALTER TABLE public.occurrences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.occurrence_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fines ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir leitura de ocorrencias" ON public.occurrences;
+DROP POLICY IF EXISTS "Permitir insercao de ocorrencias" ON public.occurrences;
+DROP POLICY IF EXISTS "Permitir atualizacao de ocorrencias" ON public.occurrences;
+DROP POLICY IF EXISTS "Permitir delecao de ocorrencias" ON public.occurrences;
+CREATE POLICY "Permitir leitura de ocorrencias" ON public.occurrences FOR SELECT USING (true);
+CREATE POLICY "Permitir insercao de ocorrencias" ON public.occurrences FOR INSERT WITH CHECK (true);
+CREATE POLICY "Permitir atualizacao de ocorrencias" ON public.occurrences FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir delecao de ocorrencias" ON public.occurrences FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Permitir leitura de comentarios de ocorrencias" ON public.occurrence_comments;
+DROP POLICY IF EXISTS "Permitir insercao de comentarios de ocorrencias" ON public.occurrence_comments;
+CREATE POLICY "Permitir leitura de comentarios de ocorrencias" ON public.occurrence_comments FOR SELECT USING (true);
+CREATE POLICY "Permitir insercao de comentarios de ocorrencias" ON public.occurrence_comments FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir leitura de multas" ON public.fines;
+DROP POLICY IF EXISTS "Permitir insercao de multas" ON public.fines;
+DROP POLICY IF EXISTS "Permitir atualizacao de multas" ON public.fines;
+DROP POLICY IF EXISTS "Permitir delecao de multas" ON public.fines;
+CREATE POLICY "Permitir leitura de multas" ON public.fines FOR SELECT USING (true);
+CREATE POLICY "Permitir insercao de multas" ON public.fines FOR INSERT WITH CHECK (true);
+CREATE POLICY "Permitir atualizacao de multas" ON public.fines FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir delecao de multas" ON public.fines FOR DELETE USING (true);
+
+-- ---------------------------------------------------------------------
+-- 14. PERMISSÕES DE ACESSO TOTAIS
 -- ---------------------------------------------------------------------
 GRANT ALL ON public.apartments TO anon, authenticated, service_role;
 GRANT ALL ON public.profiles TO anon, authenticated, service_role;
@@ -637,6 +708,9 @@ GRANT ALL ON public.condominiums TO anon, authenticated, service_role;
 GRANT ALL ON public.noise_readings TO anon, authenticated, service_role;
 GRANT ALL ON public.noise_events TO anon, authenticated, service_role;
 GRANT ALL ON public.alerts TO anon, authenticated, service_role;
+GRANT ALL ON public.occurrences TO anon, authenticated, service_role;
+GRANT ALL ON public.occurrence_comments TO anon, authenticated, service_role;
+GRANT ALL ON public.fines TO anon, authenticated, service_role;
 
 GRANT EXECUTE ON FUNCTION public.assign_resident_to_apartment(UUID, UUID) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.unassign_resident_from_apartment(UUID) TO anon, authenticated, service_role;

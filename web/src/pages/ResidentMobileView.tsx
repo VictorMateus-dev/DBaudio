@@ -16,9 +16,21 @@ import {
   Building2,
   Clock,
   Sparkles,
-  LogOut
+  LogOut,
+  FileText,
+  DollarSign,
+  Receipt,
+  QrCode,
+  Copy,
+  Printer,
+  Check,
+  X,
+  Eye,
+  EyeOff,
+  Send,
+  ShieldAlert
 } from 'lucide-react';
-import { Apartment, Alert, Occurrence } from '../types/database.types';
+import { Apartment, Alert, Occurrence, SimulatedFine, OccurrenceStatus } from '../types/database.types';
 import { DataService, localStore } from '../lib/dataService';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -37,16 +49,27 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
 }) => {
   const { user, switchRole, refreshProfile, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'occurrences' | 'profile' | 'privacy'>('home');
+  const [occSubTab, setOccSubTab] = useState<'new' | 'notices' | 'my_reports'>('new');
   const [activeModalAlert, setActiveModalAlert] = useState<Alert | null>(null);
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
   const [isPhoneFrame, setIsPhoneFrame] = useState<boolean>(true);
 
   // Form states para nova ocorrência
   const [newType, setNewType] = useState('Música Alta / Som Excessivo');
+  const [targetAptId, setTargetAptId] = useState<string>('');
   const [newLocation, setNewLocation] = useState('Apartamento 202');
   const [newDesc, setNewDesc] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [createdSuccess, setCreatedSuccess] = useState(false);
+  const [isSubmittingOcc, setIsSubmittingOcc] = useState(false);
+
+  // Dados carregados dinamicamente
+  const [availableApartments, setAvailableApartments] = useState<Apartment[]>([]);
+  const [unitFines, setUnitFines] = useState<SimulatedFine[]>([]);
+  const [allOccurrencesList, setAllOccurrencesList] = useState<Occurrence[]>(occurrences);
+  const [selectedFineForModal, setSelectedFineForModal] = useState<SimulatedFine | null>(null);
+  const [copiedBarcode, setCopiedBarcode] = useState(false);
+  const [copiedPix, setCopiedPix] = useState(false);
 
   // Unidade efetiva: caso apartment seja nulo, sintetiza com base nos dados do usuário alocado
   const effectiveApt: Apartment = apartment || {
@@ -63,6 +86,37 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
     custom_critical_threshold_db: 80,
     created_at: user?.created_at || new Date().toISOString(),
   };
+
+  // Carrega lista de apartamentos, multas da unidade e ocorrências atualizadas
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const apts = await DataService.getApartments();
+        setAvailableApartments(apts);
+        if (apts.length > 0 && !targetAptId) {
+          const other = apts.find(a => a.id !== effectiveApt.id) || apts[0];
+          if (other) {
+            setTargetAptId(other.id);
+            setNewLocation(`Apartamento ${other.number}`);
+          }
+        }
+        if (effectiveApt.id && effectiveApt.id !== 'unassigned') {
+          const fines = await DataService.getFinesByApartment(effectiveApt.id);
+          setUnitFines(fines);
+        }
+        const occs = await DataService.getOccurrences();
+        setAllOccurrencesList(occs);
+      } catch (err) {
+        console.warn('Erro ao carregar dados do morador:', err);
+      }
+    };
+
+    fetchData();
+    const unsub = localStore.subscribe(() => {
+      fetchData();
+    });
+    return () => unsub();
+  }, [effectiveApt.id]);
 
   // Detecta alerta crítico recente não lido estritamente desta unidade e abre modal automaticamente
   useEffect(() => {
@@ -91,33 +145,54 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
 
   const handleCreateOccurrence = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDesc.trim()) return;
+    if (!newDesc.trim() || isSubmittingOcc) return;
 
-    const newOcc: Occurrence = {
-      id: `occ-${Date.now()}`,
-      condominium_id: user?.condominium_id || '00000000-0000-0000-0000-000000000001',
-      reporter_id: isAnonymous ? undefined : user?.id,
-      apartment_id: effectiveApt.id,
-      type: newType,
-      location: newLocation,
-      description: newDesc.trim(),
-      occurred_at: new Date().toISOString(),
-      status: 'aberta',
-      priority: 'media',
-      anonymous: isAnonymous,
-      reporter_name: isAnonymous ? 'Morador Anônimo' : (user?.full_name || 'Morador'),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    setIsSubmittingOcc(true);
+    try {
+      const targetApt = availableApartments.find(a => a.id === targetAptId);
+      const targetNumber = targetApt?.number || newLocation.replace(/[^0-9]/g, '') || undefined;
+      const targetLocation = targetApt ? `Apartamento ${targetApt.number}` : (newLocation || 'Apartamento');
 
-    localStore.occurrences.unshift(newOcc);
-    localStore.notify();
-    setNewDesc('');
-    setCreatedSuccess(true);
-    setTimeout(() => {
-      setCreatedSuccess(false);
-      setActiveTab('occurrences');
-    }, 1500);
+      await DataService.createOccurrence({
+        condominium_id: user?.condominium_id || '00000000-0000-0000-0000-000000000001',
+        apartment_id: targetApt?.id || undefined,
+        apartment_number: targetNumber,
+        location: targetLocation,
+        type: newType,
+        description: newDesc.trim(),
+        anonymous: isAnonymous,
+        reporter_id: isAnonymous ? undefined : user?.id,
+        reporter_name: isAnonymous ? 'Morador Anônimo' : (user?.full_name || 'Morador'),
+        noise_level_db: targetApt?.current_db,
+        status: 'aberta',
+        priority: 'media',
+        occurred_at: new Date().toISOString(),
+      });
+
+      setNewDesc('');
+      setCreatedSuccess(true);
+      setTimeout(() => {
+        setCreatedSuccess(false);
+        setOccSubTab('my_reports');
+      }, 1200);
+      onRefresh();
+    } catch (err) {
+      console.error('Erro ao enviar ocorrência:', err);
+    } finally {
+      setIsSubmittingOcc(false);
+    }
+  };
+
+  const handleCopyBarcode = (code: string) => {
+    navigator.clipboard?.writeText(code);
+    setCopiedBarcode(true);
+    setTimeout(() => setCopiedBarcode(false), 2000);
+  };
+
+  const handleCopyPix = (payload: string) => {
+    navigator.clipboard?.writeText(payload);
+    setCopiedPix(true);
+    setTimeout(() => setCopiedPix(false), 2000);
   };
 
   // TELA DE ESPERA: Quando o morador confirmou e-mail mas ainda não foi alocado a um apartamento
@@ -374,71 +449,383 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
           )}
 
           {activeTab === 'occurrences' && (
-            <div className="space-y-4 text-xs">
-              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
-                <span className="text-xs font-bold text-white block">Registrar Ocorrência</span>
-                {createdSuccess && (
-                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Relato enviado ao síndico com sucesso!</span>
-                  </div>
-                )}
-                <form onSubmit={handleCreateOccurrence} className="space-y-3">
-                  <div>
-                    <label className="text-slate-400 block mb-1">Tipo</label>
-                    <select
-                      value={newType}
-                      onChange={e => setNewType(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white"
-                    >
-                      <option value="Música Alta / Som Excessivo">Música Alta / Som Excessivo</option>
-                      <option value="Reforma Fora do Horário">Reforma Fora do Horário</option>
-                      <option value="Festas e Gritos">Festas e Gritos</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-slate-400 block mb-1">Local / Unidade</label>
-                    <input
-                      type="text"
-                      value={newLocation}
-                      onChange={e => setNewLocation(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-400 block mb-1">Descrição</label>
-                    <textarea
-                      rows={3}
-                      value={newDesc}
-                      onChange={e => setNewDesc(e.target.value)}
-                      placeholder="Descreva o barulho observado..."
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white resize-none"
-                      required
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="anonMob"
-                      checked={isAnonymous}
-                      onChange={e => setIsAnonymous(e.target.checked)}
-                      className="rounded bg-slate-900 border-slate-800 text-blue-600"
-                    />
-                    <label htmlFor="anonMob" className="text-slate-300 text-[11px]">Enviar como anônimo</label>
-                  </div>
-
-                  <div className="p-2.5 bg-blue-950/20 border border-blue-800/30 rounded-lg text-[10px] text-blue-300">
-                    🔒 Esta ocorrência utiliza dados quantitativos de ruído. O sistema não grava ou armazena áudio.
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-lg text-xs transition"
-                  >
-                    Confirmar Envio
-                  </button>
-                </form>
+            <div className="space-y-3 text-xs">
+              {/* Sub-tabs de Ocorrências */}
+              <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setOccSubTab('new')}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-medium text-[11px] transition text-center ${
+                    occSubTab === 'new'
+                      ? 'bg-blue-600 text-white font-bold shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Nova Denúncia
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOccSubTab('notices')}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-medium text-[11px] transition text-center relative ${
+                    occSubTab === 'notices'
+                      ? 'bg-blue-600 text-white font-bold shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span>Minha Unidade</span>
+                  {(unitFines.filter(f => f.status === 'pendente').length > 0) && (
+                    <span className="ml-1 px-1.5 py-0.2 bg-red-500 text-white text-[9px] font-bold rounded-full">
+                      {unitFines.filter(f => f.status === 'pendente').length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOccSubTab('my_reports')}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-medium text-[11px] transition text-center ${
+                    occSubTab === 'my_reports'
+                      ? 'bg-blue-600 text-white font-bold shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Meus Relatos
+                </button>
               </div>
+
+              {/* Subaba 1: Nova Denúncia */}
+              {occSubTab === 'new' && (
+                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">Registrar Ocorrência / Denúncia</span>
+                    <span className="text-[10px] text-slate-400">Proteção de Privacidade Ativa</span>
+                  </div>
+
+                  {createdSuccess && (
+                    <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs flex items-center gap-1.5 animate-fadeIn">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span>Relato enviado ao síndico com sucesso!</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleCreateOccurrence} className="space-y-3">
+                    <div>
+                      <label className="text-slate-400 block mb-1">Apartamento Infrator (Alvo do Relato)</label>
+                      <select
+                        value={targetAptId}
+                        onChange={e => {
+                          setTargetAptId(e.target.value);
+                          const found = availableApartments.find(a => a.id === e.target.value);
+                          if (found) setNewLocation(`Apartamento ${found.number}`);
+                        }}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white text-xs"
+                      >
+                        {availableApartments.length === 0 ? (
+                          <option value="">Carregando apartamentos...</option>
+                        ) : (
+                          availableApartments.map(apt => (
+                            <option key={apt.id} value={apt.id}>
+                              Apartamento {apt.number} (Andar {apt.floor}) {apt.id === effectiveApt.id ? '• Minha Unidade' : ''}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Telemetria Acústica do Alvo */}
+                    {(() => {
+                      const targetApt = availableApartments.find(a => a.id === targetAptId);
+                      if (!targetApt) return null;
+                      return (
+                        <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-between text-[11px]">
+                          <div className="flex items-center gap-1.5 text-slate-400">
+                            <Volume2 className="w-3.5 h-3.5 text-violet-400" />
+                            <span>Telemetria atual do alvo:</span>
+                          </div>
+                          <span className={`font-mono font-bold ${
+                            (targetApt.current_db || 0) >= 80 ? 'text-red-400' :
+                            (targetApt.current_db || 0) >= 65 ? 'text-amber-400' : 'text-emerald-400'
+                          }`}>
+                            {targetApt.current_db != null ? targetApt.current_db.toFixed(1) : '40.0'} dB SPL
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    <div>
+                      <label className="text-slate-400 block mb-1">Tipo de Perturbação</label>
+                      <select
+                        value={newType}
+                        onChange={e => setNewType(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white text-xs"
+                      >
+                        <option value="Música Alta / Som Excessivo">Música Alta / Som Excessivo</option>
+                        <option value="Reforma Fora do Horário">Reforma Fora do Horário</option>
+                        <option value="Festas e Gritos">Festas e Gritos</option>
+                        <option value="Ruído de Impacto / Móveis / Salto">Ruído de Impacto / Móveis / Salto</option>
+                        <option value="Latidos Contínuos / Animais">Latidos Contínuos / Animais</option>
+                        <option value="Outros Ruídos Perturbadores">Outros Ruídos Perturbadores</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-400 block mb-1">Descrição do Ocorrido</label>
+                      <textarea
+                        rows={3}
+                        value={newDesc}
+                        onChange={e => setNewDesc(e.target.value)}
+                        placeholder="Descreva o barulho observado, horário de início e o incômodo gerado..."
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white resize-none text-xs"
+                        required
+                      />
+                    </div>
+
+                    {/* Card de Denúncia Anônima */}
+                    <div 
+                      onClick={() => setIsAnonymous(!isAnonymous)}
+                      className={`p-3 rounded-xl border transition cursor-pointer ${
+                        isAnonymous 
+                          ? 'bg-emerald-950/30 border-emerald-500/50 shadow-sm' 
+                          : 'bg-slate-950/40 border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="anonMob"
+                            checked={isAnonymous}
+                            onChange={e => setIsAnonymous(e.target.checked)}
+                            onClick={e => e.stopPropagation()}
+                            className="rounded bg-slate-900 border-slate-800 text-emerald-600 focus:ring-0"
+                          />
+                          <label htmlFor="anonMob" className="text-white font-semibold text-xs cursor-pointer">
+                            Denúncia Anônima (100% Protegida)
+                          </label>
+                        </div>
+                        {isAnonymous ? <EyeOff className="w-4 h-4 text-emerald-400" /> : <Eye className="w-4 h-4 text-slate-500" />}
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1 pl-6">
+                        {isAnonymous 
+                          ? '🛡️ Seu nome e apartamento NÃO serão revelados ao síndico nem à unidade denunciada.' 
+                          : 'Sua identificação ficará visível apenas para o síndico administrar o caso.'}
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 bg-blue-950/20 border border-blue-800/30 rounded-lg text-[10px] text-blue-300">
+                      🔒 O dBSound não grava nem transmite áudio/voz. Somente telemetria quantitativa de ruído em dB SPL é associada.
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmittingOcc || !newDesc.trim()}
+                      className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-2"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isSubmittingOcc ? 'Enviando ao Síndico...' : 'Confirmar Envio'}</span>
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* Subaba 2: Notificações & Multas da Minha Unidade */}
+              {occSubTab === 'notices' && (
+                <div className="space-y-3">
+                  {/* Multas Fictícias da Unidade */}
+                  {unitFines.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-white flex items-center gap-1.5">
+                          <DollarSign className="w-3.5 h-3.5 text-red-400" />
+                          <span>Multas da Unidade {effectiveApt.number}</span>
+                        </span>
+                        <span className="text-[10px] text-amber-400 font-semibold">Boleto Simulado</span>
+                      </div>
+
+                      {unitFines.map(fine => (
+                        <div key={fine.id} className="p-3 bg-slate-950/80 border border-red-500/30 rounded-xl space-y-2">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 mb-1">
+                                <span>Doc. de Cobrança Simulado</span>
+                              </div>
+                              <h4 className="font-bold text-white text-xs">{fine.reason}</h4>
+                              <p className="text-[10px] text-slate-400">Vencimento: {new Date(fine.due_date).toLocaleDateString('pt-BR')}</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-base font-extrabold text-emerald-400 font-mono">
+                                R$ {fine.amount.toFixed(2)}
+                              </span>
+                              <span className={`block text-[9px] font-bold uppercase ${
+                                fine.status === 'paga' ? 'text-emerald-400' : 'text-amber-400'
+                              }`}>
+                                {fine.status === 'paga' ? 'Liquidada' : 'Pendente'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedFineForModal(fine)}
+                            className="w-full py-2 px-3 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-violet-300 font-semibold text-[11px] flex items-center justify-center gap-1.5 transition"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Ver Boleto / Doc. Cobrança SIMULADO</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Advertências e Notificações Administrativas */}
+                  {(() => {
+                    const unitNotices = allOccurrencesList.filter(
+                      o => o.apartment_id === effectiveApt.id && 
+                      ['advertência', 'multa', 'procedente', 'em análise', 'resolvida'].includes(o.status)
+                    );
+
+                    if (unitNotices.length === 0 && unitFines.length === 0) {
+                      return (
+                        <div className="p-6 text-center text-slate-400 bg-slate-950/40 border border-slate-800 rounded-xl space-y-2">
+                          <ShieldCheck className="w-8 h-8 text-emerald-400 mx-auto" />
+                          <p className="font-semibold text-white">Nenhuma notificação ou multa ativa</p>
+                          <p className="text-[11px] text-slate-500">
+                            Sua unidade ({effectiveApt.number}) está em plena conformidade com as regras de convivência acústica.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-2 pt-1">
+                        <span className="text-xs font-bold text-white block">
+                          Notificações da Administração ({unitNotices.length})
+                        </span>
+
+                        {unitNotices.map(notif => (
+                          <div key={notif.id} className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2 text-xs">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <span className="font-bold text-white block">{notif.type}</span>
+                                <span className="text-[10px] text-slate-400">
+                                  {new Date(notif.occurred_at || notif.created_at).toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                notif.status === 'multa' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                notif.status === 'advertência' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                                notif.status === 'procedente' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                                'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                              }`}>
+                                {notif.status}
+                              </span>
+                            </div>
+
+                            {/* Detalhes sem exibir o denunciante (garantia de anonimato absoluto) */}
+                            <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800/80 text-[11px] space-y-1">
+                              <span className="text-violet-400 font-semibold block mb-0.5">Parecer da Administração:</span>
+                              <p className="text-slate-300">
+                                {notif.syndic_notes || 'Ocorrência sob averiguação do síndico. Mantenha os níveis sonoros dentro dos limites permitidos.'}
+                              </p>
+                              {notif.noise_level_db != null && (
+                                <p className="text-[10px] text-slate-400 pt-0.5">
+                                  Telemetria registrada pelo sensor: <strong className="text-white font-mono">{notif.noise_level_db} dB SPL</strong>
+                                </p>
+                              )}
+                            </div>
+
+                            <span className="text-[10px] text-slate-500 italic block">
+                              🔒 A identidade de eventuais denunciantes é rigorosamente protegida.
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Subaba 3: Minhas Denúncias Enviadas */}
+              {occSubTab === 'my_reports' && (
+                <div className="space-y-3">
+                  <span className="text-xs font-bold text-white block">Histórico de Relatos Enviados por Você</span>
+                  {(() => {
+                    const myReports = allOccurrencesList.filter(
+                      o => o.reporter_id === user?.id || (o.apartment_id !== effectiveApt.id && (!o.reporter_id || o.reporter_name === user?.full_name))
+                    );
+
+                    if (myReports.length === 0) {
+                      return (
+                        <div className="p-6 text-center text-slate-400 bg-slate-950/40 border border-slate-800 rounded-xl space-y-2">
+                          <AlertTriangle className="w-8 h-8 text-slate-600 mx-auto" />
+                          <p className="font-semibold text-white">Nenhum relato registrado</p>
+                          <p className="text-[11px] text-slate-500">
+                            Quando você registrar barulhos anômalos de outras unidades, o status do acompanhamento aparecerá aqui.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setOccSubTab('new')}
+                            className="mt-2 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-[11px] font-bold"
+                          >
+                            Registrar Primeiro Relato
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-2">
+                        {myReports.map(rep => (
+                          <div key={rep.id} className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2 text-xs">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <span className="font-bold text-white block">
+                                  Alvo: {rep.location || `Apto ${rep.apartment_number || 'N/A'}`}
+                                </span>
+                                <span className="text-[10px] text-slate-400 block">{rep.type}</span>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                rep.status === 'multa' ? 'bg-red-500/20 text-red-400' :
+                                rep.status === 'advertência' ? 'bg-amber-500/20 text-amber-400' :
+                                rep.status === 'procedente' ? 'bg-emerald-500/20 text-emerald-400' :
+                                rep.status === 'improcedente' ? 'bg-slate-700 text-slate-400' :
+                                'bg-blue-500/20 text-blue-400'
+                              }`}>
+                                {rep.status}
+                              </span>
+                            </div>
+
+                            <p className="text-slate-300 text-[11px] line-clamp-2 bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                              "{rep.description}"
+                            </p>
+
+                            <div className="flex items-center justify-between text-[10px] text-slate-400">
+                              <span className="flex items-center gap-1">
+                                {rep.anonymous ? (
+                                  <span className="text-emerald-400 font-medium flex items-center gap-1">
+                                    <EyeOff className="w-3 h-3" /> Anônima
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 flex items-center gap-1">
+                                    <User className="w-3 h-3" /> Identificada
+                                  </span>
+                                )}
+                              </span>
+                              <span>{new Date(rep.created_at).toLocaleDateString('pt-BR')}</span>
+                            </div>
+
+                            {rep.syndic_notes && (
+                              <div className="p-2 rounded-lg bg-violet-950/20 border border-violet-800/30 text-[10px] text-violet-300">
+                                <strong className="text-white block mb-0.5">Resposta do Síndico:</strong>
+                                {rep.syndic_notes}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
 
@@ -542,6 +929,131 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
             <span>Perfil</span>
           </button>
         </div>
+
+        {/* Modal de Visualização de Documento de Cobrança / Boleto SIMULADO */}
+        {selectedFineForModal && (
+          <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-3 z-50 overflow-y-auto">
+            <div className="bg-slate-900 border border-violet-500/40 rounded-3xl p-4 text-xs space-y-3.5 shadow-2xl max-w-sm w-full my-auto animate-fadeIn">
+              
+              {/* Simulation Warning Banner */}
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+                <span className="font-semibold leading-tight">DOCUMENTO DE COBRANÇA SIMULADO (AMBIENTE DE TESTE)</span>
+              </div>
+
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-400 flex items-center justify-center">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white text-xs">dBSound Condomínio</h4>
+                    <p className="text-[10px] text-slate-400">Notificação e Cobrança Fictícia</p>
+                  </div>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setSelectedFineForModal(null)}
+                  className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex justify-between text-slate-400">
+                  <span>Unidade Notificada:</span>
+                  <strong className="text-white font-mono">Apto {effectiveApt.number}</strong>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>Vencimento:</span>
+                  <strong className="text-amber-400 font-mono">{new Date(selectedFineForModal.due_date).toLocaleDateString('pt-BR')}</strong>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>Valor da Multa:</span>
+                  <strong className="text-emerald-400 font-mono text-sm">R$ {selectedFineForModal.amount.toFixed(2)}</strong>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>Situação Atual:</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    selectedFineForModal.status === 'paga' 
+                      ? 'bg-emerald-500/20 text-emerald-400' 
+                      : 'bg-amber-500/20 text-amber-400'
+                  }`}>
+                    {selectedFineForModal.status === 'paga' ? 'Liquidada' : 'Aguardando Pagamento'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Barcode line */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Linha Digitável do Boleto Simulado
+                </span>
+                <div className="p-2 bg-slate-950 border border-slate-800 rounded-lg flex items-center justify-between gap-2">
+                  <code className="text-[10px] text-slate-300 font-mono break-all leading-none">
+                    {selectedFineForModal.barcode_line || '34191.09008 00000.123456 78901.234567 8 98760000050000'}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyBarcode(selectedFineForModal.barcode_line || '34191.09008 00000.123456 78901.234567 8 98760000050000')}
+                    className="p-1.5 rounded bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 shrink-0"
+                    title="Copiar linha digitável"
+                  >
+                    {copiedBarcode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* PIX */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Chave / Payload PIX Copia e Cola
+                </span>
+                <div className="p-2 bg-slate-950 border border-slate-800 rounded-lg flex items-center justify-between gap-2">
+                  <code className="text-[10px] text-slate-300 font-mono truncate">
+                    {selectedFineForModal.pix_payload || '00020126580014BR.GOV.BCB.PIX...'}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPix(selectedFineForModal.pix_payload || '00020126580014BR.GOV.BCB.PIX...')}
+                    className="p-1.5 rounded bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 shrink-0"
+                    title="Copiar PIX"
+                  >
+                    {copiedPix ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-[10px] text-slate-400 space-y-1">
+                <span className="text-white font-semibold block">Motivo da Aplicação:</span>
+                <p>{selectedFineForModal.reason}</p>
+                {selectedFineForModal.regimental_observation && (
+                  <p className="text-slate-500 italic mt-1">{selectedFineForModal.regimental_observation}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFineForModal(null)}
+                  className="py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition"
+                >
+                  Fechar
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
 
         {/* Modal de Alerta Crítico (Exato Requisito 23) */}
         {activeModalAlert && (

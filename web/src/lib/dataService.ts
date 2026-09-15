@@ -2,8 +2,10 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { 
   Apartment, Device, Sensor, NoiseReading, 
   NoiseEvent, Alert, Occurrence, OccurrenceComment, NoisePolicy, Profile,
-  UserHistoryReport, CreateApartmentDTO, UpdateApartmentThresholdsDTO
+  UserHistoryReport, CreateApartmentDTO, UpdateApartmentThresholdsDTO,
+  SimulatedFine, CreateFineDTO, OccurrenceStatus
 } from '../types/database.types';
+import { currentBillingProvider } from './billingProvider';
 
 export const DEFAULT_CONDO_ID = '00000000-0000-0000-0000-000000000001';
 export const DEFAULT_BUILDING_ID = '00000000-0000-0000-0000-000000000002';
@@ -234,6 +236,61 @@ export function saveStoredProfiles(profiles: Profile[]) {
   }
 }
 
+const OCCURRENCES_STORAGE_KEY = 'dbsound_occurrences';
+const FINES_STORAGE_KEY = 'dbsound_fines';
+
+export function getStoredOccurrences(): Occurrence[] {
+  if (typeof window === 'undefined') return [...initialOccurrences];
+  try {
+    const raw = localStorage.getItem(OCCURRENCES_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const map = new Map(parsed.map((o: Occurrence) => [o.id, o]));
+        initialOccurrences.forEach(io => {
+          if (!map.has(io.id)) parsed.push(io);
+        });
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Erro ao ler dbsound_occurrences do localStorage:', e);
+  }
+  return [...initialOccurrences];
+}
+
+export function saveStoredOccurrences(occs: Occurrence[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(OCCURRENCES_STORAGE_KEY, JSON.stringify(occs));
+  } catch (e) {
+    console.warn('Erro ao salvar dbsound_occurrences no localStorage:', e);
+  }
+}
+
+export function getStoredFines(): SimulatedFine[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(FINES_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.warn('Erro ao ler dbsound_fines do localStorage:', e);
+  }
+  return [];
+}
+
+export function saveStoredFines(fines: SimulatedFine[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(FINES_STORAGE_KEY, JSON.stringify(fines));
+  } catch (e) {
+    console.warn('Erro ao salvar dbsound_fines no localStorage:', e);
+  }
+}
+
 // ============================================================================
 // STORE REATIVO LOCAL (Sincroniza com componentes e mantém estado persistente)
 // ============================================================================
@@ -244,7 +301,8 @@ class LocalDataStore {
   policies = [...initialPolicies];
   profiles: Profile[] = getStoredProfiles();
   alerts = [...initialAlerts];
-  occurrences = [...initialOccurrences];
+  occurrences: Occurrence[] = getStoredOccurrences();
+  fines: SimulatedFine[] = getStoredFines();
   comments: Record<string, OccurrenceComment[]> = { ...initialComments };
   readings: NoiseReading[] = [];
   listeners: Array<() => void> = [];
@@ -267,6 +325,14 @@ class LocalDataStore {
 
   saveProfiles() {
     saveStoredProfiles(this.profiles);
+  }
+
+  saveOccurrences() {
+    saveStoredOccurrences(this.occurrences);
+  }
+
+  saveFines() {
+    saveStoredFines(this.fines);
   }
 
   saveProfile(profile: Profile) {
@@ -1102,15 +1168,92 @@ export const DataService = {
     localStore.notify();
   },
 
-  // OCORRÊNCIAS
+  // OCORRÊNCIAS & DENÚNCIAS
+  async createOccurrence(dto: Partial<Occurrence>): Promise<Occurrence> {
+    let aptNumber = dto.apartment_number;
+    if (!aptNumber && dto.apartment_id) {
+      const apt = localStore.apartments.find(a => a.id === dto.apartment_id);
+      if (apt) aptNumber = apt.number;
+    }
+
+    const newOcc: Occurrence = {
+      id: dto.id || `occ-${Date.now()}`,
+      condominium_id: dto.condominium_id || DEFAULT_CONDO_ID,
+      reporter_id: dto.anonymous ? undefined : dto.reporter_id,
+      apartment_id: dto.apartment_id || null,
+      apartment_number: aptNumber || dto.location?.replace(/[^0-9]/g, '') || undefined,
+      type: dto.type || 'Música Alta / Som Excessivo',
+      location: dto.location || (aptNumber ? `Apartamento ${aptNumber}` : 'Área Residencial'),
+      description: dto.description || '',
+      occurred_at: dto.occurred_at || new Date().toISOString(),
+      status: (dto.status as OccurrenceStatus) || 'aberta',
+      priority: dto.priority || 'media',
+      anonymous: Boolean(dto.anonymous),
+      reporter_name: dto.anonymous ? 'Morador Anônimo' : (dto.reporter_name || 'Morador'),
+      noise_level_db: dto.noise_level_db,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const supaPayload: any = {
+          id: newOcc.id.includes('-') && newOcc.id.length === 36 ? newOcc.id : undefined,
+          condominium_id: newOcc.condominium_id,
+          reporter_id: newOcc.anonymous ? null : (newOcc.reporter_id || null),
+          apartment_id: newOcc.apartment_id || null,
+          type: newOcc.type,
+          location: newOcc.location,
+          description: newOcc.description,
+          occurred_at: newOcc.occurred_at,
+          status: newOcc.status,
+          priority: newOcc.priority,
+          anonymous: newOcc.anonymous,
+          apartment_number: newOcc.apartment_number,
+          noise_level_db: newOcc.noise_level_db,
+          created_at: newOcc.created_at,
+          updated_at: newOcc.updated_at,
+        };
+        const { data, error } = await supabase.from('occurrences').insert(supaPayload).select().single();
+        if (!error && data) {
+          newOcc.id = data.id;
+        }
+      } catch (err) {
+        console.warn('Erro ao inserir ocorrência no Supabase:', err);
+      }
+    }
+
+    localStore.occurrences.unshift(newOcc);
+    localStore.saveOccurrences();
+    localStore.notify();
+    return newOcc;
+  },
+
   async getOccurrences(): Promise<Occurrence[]> {
     if (isSupabaseConfigured && supabase) {
-      const { data } = await supabase.from('occurrences').select('*, profiles(full_name)').order('created_at', { ascending: false });
-      if (data) {
-        return data.map((o: any) => ({
-          ...o,
-          reporter_name: o.anonymous ? 'Morador Anônimo' : (o.profiles?.full_name || 'Morador')
-        }));
+      try {
+        const { data, error } = await supabase
+          .from('occurrences')
+          .select('*, apartments(number)')
+          .order('created_at', { ascending: false });
+
+        if (!error && data && Array.isArray(data)) {
+          const supaOccs: Occurrence[] = data.map((o: any) => ({
+            ...o,
+            apartment_number: o.apartments?.number || o.apartment_number || o.location?.replace(/[^0-9]/g, '') || undefined,
+            reporter_name: o.anonymous ? 'Morador Anônimo' : (o.reporter_name || 'Morador')
+          }));
+
+          // Merge inteligente preservando registros locais
+          const supaIds = new Set(supaOccs.map(s => s.id));
+          const localOnly = localStore.occurrences.filter(lo => !supaIds.has(lo.id));
+          const merged = [...supaOccs, ...localOnly];
+          localStore.occurrences = merged;
+          localStore.saveOccurrences();
+          return merged;
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar ocorrências do Supabase:', e);
       }
     }
     return localStore.occurrences;
@@ -1124,8 +1267,43 @@ export const DataService = {
     if (occ) {
       occ.status = status;
       occ.updated_at = new Date().toISOString();
+      localStore.saveOccurrences();
       localStore.notify();
     }
+  },
+
+  async decideOccurrence(id: string, decision: OccurrenceStatus, notes?: string, authorName = 'Síndico Geral'): Promise<boolean> {
+    const decisionAt = new Date().toISOString();
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('occurrences').update({
+          status: decision,
+          decision,
+          syndic_notes: notes || null,
+          decision_at: decisionAt,
+          updated_at: decisionAt,
+        }).eq('id', id);
+      } catch (e) {
+        console.warn('Erro ao registrar decisão no Supabase:', e);
+      }
+    }
+
+    const occ = localStore.occurrences.find(o => o.id === id);
+    if (occ) {
+      occ.status = decision;
+      occ.decision = decision;
+      occ.syndic_notes = notes;
+      occ.decision_at = decisionAt;
+      occ.updated_at = decisionAt;
+      localStore.saveOccurrences();
+    }
+
+    // Registra entrada de auditoria nos comentários
+    const auditText = `[DECISÃO DO SÍNDICO: ${decision.toUpperCase()}] ${notes ? 'Parecer: ' + notes : 'Decisão registrada no sistema.'}`;
+    await this.addComment(id, 'admin1', auditText, authorName);
+
+    localStore.notify();
+    return true;
   },
 
   async getComments(occurrenceId: string): Promise<OccurrenceComment[]> {
@@ -1165,6 +1343,129 @@ export const DataService = {
     localStore.comments[occurrenceId].push(newComment);
     localStore.notify();
     return newComment;
+  },
+
+  // MULTAS E COBRANÇAS SIMULADAS
+  async getFines(): Promise<SimulatedFine[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.from('fines').select('*, apartments(number)').order('created_at', { ascending: false });
+        if (!error && data && Array.isArray(data)) {
+          const mapped: SimulatedFine[] = data.map((f: any) => ({
+            ...f,
+            apartment_number: f.apartments?.number || f.apartment_number || 'N/A'
+          }));
+          const supaIds = new Set(mapped.map(m => m.id));
+          const localOnly = localStore.fines.filter(lf => !supaIds.has(lf.id));
+          const merged = [...mapped, ...localOnly];
+          localStore.fines = merged;
+          localStore.saveFines();
+          return merged;
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar multas do Supabase:', e);
+      }
+    }
+    return localStore.fines;
+  },
+
+  async getFinesByApartment(apartmentId: string): Promise<SimulatedFine[]> {
+    const fines = await this.getFines();
+    return fines.filter(f => f.apartment_id === apartmentId);
+  },
+
+  async createFine(dto: CreateFineDTO): Promise<SimulatedFine> {
+    const apt = localStore.apartments.find(a => a.id === dto.apartment_id);
+    const aptNumber = dto.apartment_number || apt?.number || 'N/A';
+
+    // Gera cobrança via BillingProvider desacoplado
+    const charge = await currentBillingProvider.createCharge({
+      amount: dto.amount,
+      description: dto.reason,
+      dueDate: dto.due_date,
+      apartmentNumber: aptNumber,
+      occurrenceId: dto.occurrence_id,
+    });
+
+    const fine: SimulatedFine = {
+      id: charge.chargeId,
+      condominium_id: DEFAULT_CONDO_ID,
+      apartment_id: dto.apartment_id,
+      apartment_number: aptNumber,
+      occurrence_id: dto.occurrence_id,
+      fine_number: charge.fineNumber,
+      reason: dto.reason,
+      amount: Number(dto.amount),
+      due_date: dto.due_date,
+      issue_date: charge.issueDate,
+      status: 'pendente',
+      syndic_notes: dto.syndic_notes,
+      barcode: charge.barcode,
+      barcode_line: charge.barcode,
+      qr_code_pix: charge.qrCodePix,
+      pix_payload: charge.qrCodePix,
+      provider: charge.provider,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('fines').insert({
+          id: fine.id.includes('-') && fine.id.length === 36 ? fine.id : undefined,
+          condominium_id: fine.condominium_id,
+          apartment_id: fine.apartment_id,
+          occurrence_id: fine.occurrence_id || null,
+          fine_number: fine.fine_number,
+          reason: fine.reason,
+          amount: fine.amount,
+          due_date: fine.due_date,
+          issue_date: fine.issue_date,
+          status: fine.status,
+          syndic_notes: fine.syndic_notes,
+          barcode: fine.barcode,
+          qr_code_pix: fine.qr_code_pix,
+          provider: fine.provider,
+        });
+      } catch (err) {
+        console.warn('Erro ao inserir multa no Supabase:', err);
+      }
+    }
+
+    // Se vinculada a uma ocorrência, atualiza o status da ocorrência para 'multa'
+    if (dto.occurrence_id) {
+      await this.decideOccurrence(
+        dto.occurrence_id,
+        'multa',
+        `Multa ${fine.fine_number} no valor de R$ ${fine.amount.toFixed(2)} aplicada com vencimento para ${fine.due_date}. Motivo: ${fine.reason}`
+      );
+    }
+
+    localStore.fines.unshift(fine);
+    localStore.saveFines();
+    localStore.notify();
+    return fine;
+  },
+
+  async simulatePayFine(fineId: string): Promise<boolean> {
+    const paidAt = new Date().toISOString();
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('fines').update({ status: 'paga', paid_at: paidAt, updated_at: paidAt }).eq('id', fineId);
+      } catch (e) {
+        console.warn('Erro ao atualizar pagamento da multa no Supabase:', e);
+      }
+    }
+
+    const fine = localStore.fines.find(f => f.id === fineId);
+    if (fine) {
+      fine.status = 'paga';
+      fine.paid_at = paidAt;
+      fine.updated_at = paidAt;
+      localStore.saveFines();
+    }
+    localStore.notify();
+    return true;
   },
 
   // PIPELINE ÚNICO: INGESTÃO DE LEITURA (SIMULADOR, MANUAL OU ESP32)

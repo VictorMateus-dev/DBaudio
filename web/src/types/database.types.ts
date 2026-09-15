@@ -2,7 +2,7 @@ export type Role = 'resident' | 'admin';
 export type DeviceStatus = 'online' | 'offline' | 'maintenance';
 export type NoiseSeverity = 'normal' | 'warning' | 'critical';
 export type ReadingSource = 'esp32' | 'manual' | 'simulation';
-export type OccurrenceStatus = 'aberta' | 'em análise' | 'resolvida' | 'cancelada';
+export type OccurrenceStatus = 'aberta' | 'em análise' | 'procedente' | 'improcedente' | 'advertência' | 'multa' | 'resolvida' | 'cancelada';
 export type OccurrencePriority = 'baixa' | 'media' | 'alta';
 
 export interface Condominium {
@@ -141,6 +141,7 @@ export interface Occurrence {
   condominium_id: string;
   reporter_id?: string;
   apartment_id?: string | null;
+  apartment_number?: string;
   type: string;
   location: string;
   description: string;
@@ -148,9 +149,49 @@ export interface Occurrence {
   status: OccurrenceStatus;
   priority: OccurrencePriority;
   anonymous: boolean;
+  syndic_notes?: string;
+  decision?: string;
+  decision_at?: string;
+  noise_level_db?: number;
   created_at: string;
   updated_at: string;
   reporter_name?: string;
+}
+
+export type FineStatus = 'pendente' | 'paga' | 'vencida' | 'cancelada';
+
+export interface SimulatedFine {
+  id: string;
+  condominium_id: string;
+  apartment_id: string;
+  apartment_number?: string;
+  occurrence_id?: string;
+  fine_number: string;
+  reason: string;
+  amount: number;
+  due_date: string;
+  issue_date: string;
+  status: FineStatus;
+  syndic_notes?: string;
+  regimental_observation?: string;
+  barcode: string;
+  barcode_line?: string;
+  qr_code_pix?: string;
+  pix_payload?: string;
+  provider: string;
+  paid_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateFineDTO {
+  apartment_id: string;
+  apartment_number?: string;
+  occurrence_id?: string;
+  reason: string;
+  amount: number;
+  due_date: string;
+  syndic_notes?: string;
 }
 
 export interface OccurrenceComment {
