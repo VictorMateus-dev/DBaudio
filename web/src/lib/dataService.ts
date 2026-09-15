@@ -3,7 +3,7 @@ import {
   Apartment, Device, Sensor, NoiseReading, 
   NoiseEvent, Alert, Occurrence, OccurrenceComment, NoisePolicy, Profile,
   UserHistoryReport, CreateApartmentDTO, UpdateApartmentThresholdsDTO,
-  SimulatedFine, CreateFineDTO, OccurrenceStatus,
+  SimulatedFine, CreateFineDTO, CancelFineDTO, OccurrenceStatus,
   Conversation, ConversationMessage, CreateConversationDTO, SendMessageDTO,
   ConversationType, ConversationStatus
 } from '../types/database.types';
@@ -190,7 +190,9 @@ const initialMessages: Record<string, ConversationMessage[]> = {
       conversation_id: 'conv-occ-1',
       sender_id: 'aaaa1111-0000-0000-0000-000000000001',
       sender_name: 'Carlos Síndico Geral',
+      sender_role: 'syndic',
       message: 'Olá! Recebemos relatos de som mecânico com graves elevados nesta unidade após às 22h. Poderia verificar e adequar o volume?',
+      content: 'Olá! Recebemos relatos de som mecânico com graves elevados nesta unidade após às 22h. Poderia verificar e adequar o volume?',
       read: true,
       created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
     },
@@ -199,7 +201,9 @@ const initialMessages: Record<string, ConversationMessage[]> = {
       conversation_id: 'conv-occ-1',
       sender_id: 'cccc3333-0000-0000-0000-000000000202',
       sender_name: 'Mariana Oliveira (Apto 202)',
+      sender_role: 'resident',
       message: 'Olá Síndico, já reduzimos o volume. Desculpe pelo transtorno.',
+      content: 'Olá Síndico, já reduzimos o volume. Desculpe pelo transtorno.',
       read: true,
       created_at: new Date(Date.now() - 3600000 * 1.5).toISOString(),
     }
@@ -210,7 +214,9 @@ const initialMessages: Record<string, ConversationMessage[]> = {
       conversation_id: 'conv-prev-103',
       sender_id: 'aaaa1111-0000-0000-0000-000000000001',
       sender_name: 'Carlos Síndico Geral',
+      sender_role: 'syndic',
       message: 'Olá! Identificamos ruído sonoro de 74.5 dB pelo sensor acústico em seu apartamento. Poderia verificar preventivamente para mantermos o sossego coletivo?',
+      content: 'Olá! Identificamos ruído sonoro de 74.5 dB pelo sensor acústico em seu apartamento. Poderia verificar preventivamente para mantermos o sossego coletivo?',
       read: false,
       created_at: new Date(Date.now() - 3600000 * 1).toISOString(),
     }
@@ -469,6 +475,10 @@ class LocalDataStore {
 
   saveMessages() {
     saveStoredMessages(this.messages);
+  }
+
+  saveAlerts() {
+    // Mantido em memória e sincronizado reativamente com listeners
   }
 
   saveProfile(profile: Profile) {
@@ -1577,8 +1587,80 @@ export const DataService = {
       );
     }
 
+    // Notificação unilateral/informativa para o morador da unidade
+    const fineAlert: Alert = {
+      id: `alt-fine-${Date.now()}`,
+      apartment_id: fine.apartment_id,
+      type: 'policy_violation',
+      title: 'NOVA MULTA REGISTRADA',
+      message: `Foi aplicada uma multa no valor de R$ ${fine.amount.toFixed(2)} (${fine.fine_number}) com vencimento para ${new Date(fine.due_date).toLocaleDateString('pt-BR')}. Motivo: ${fine.reason}. Acesse a aba Minha Unidade para detalhes.`,
+      severity: 'warning',
+      read: false,
+      created_at: new Date().toISOString(),
+    };
+    localStore.alerts.unshift(fineAlert);
+    localStore.saveAlerts();
+
     localStore.fines.unshift(fine);
     localStore.saveFines();
+    localStore.notify();
+    return fine;
+  },
+
+  async cancelFine(dto: CancelFineDTO): Promise<SimulatedFine | null> {
+    const fine = localStore.fines.find(f => f.id === dto.fine_id);
+    if (!fine) return null;
+
+    const now = new Date().toISOString();
+    const prevStatus = fine.status;
+    fine.status = 'cancelada';
+    fine.cancelled_at = now;
+    fine.cancelled_by = dto.cancelled_by || 'Síndico Geral';
+    fine.cancellation_reason = dto.cancellation_reason;
+    fine.previous_status = prevStatus;
+    fine.updated_at = now;
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('fines').update({
+          status: 'cancelada',
+          cancelled_at: now,
+          cancelled_by: fine.cancelled_by,
+          cancellation_reason: fine.cancellation_reason,
+          previous_status: prevStatus,
+          updated_at: now,
+        }).eq('id', dto.fine_id);
+      } catch (e) {
+        console.warn('Erro ao atualizar cancelamento de multa no Supabase:', e);
+      }
+    }
+
+    localStore.saveFines();
+
+    // Adiciona nota na ocorrência vinculada (se houver)
+    if (fine.occurrence_id) {
+      await this.addComment(
+        fine.occurrence_id,
+        'admin',
+        `Multa ${fine.fine_number} (R$ ${fine.amount.toFixed(2)}) foi CANCELADA pelo Síndico (${fine.cancelled_by}). Motivo: ${dto.cancellation_reason}`,
+        fine.cancelled_by
+      );
+    }
+
+    // Cria notificação/alerta para o morador da unidade
+    const cancelAlert: Alert = {
+      id: `alt-cancel-${Date.now()}`,
+      apartment_id: fine.apartment_id,
+      type: 'policy_violation',
+      title: 'MULTA CANCELADA PELA ADMINISTRAÇÃO',
+      message: `A multa ${fine.fine_number} (R$ ${fine.amount.toFixed(2)}) anteriormente registrada foi cancelada pelo Síndico. Motivo: ${dto.cancellation_reason}`,
+      severity: 'warning',
+      read: false,
+      created_at: now,
+    };
+    localStore.alerts.unshift(cancelAlert);
+    localStore.saveAlerts();
+
     localStore.notify();
     return fine;
   },
@@ -1618,6 +1700,7 @@ export const DataService = {
         if (!error && data && Array.isArray(data)) {
           const mapped: Conversation[] = data.map((c: any) => ({
             ...c,
+            subject: c.title || c.subject || 'Conversa',
             apartment_number: c.apartments?.number || c.apartment_number || 'N/A'
           }));
           const supaIds = new Set(mapped.map(m => m.id));
@@ -1636,17 +1719,18 @@ export const DataService = {
       result = result.filter(c => c.apartment_id === apartmentId);
     }
 
-    // Calcula unread_count e last_message para cada conversa
+    // Calcula unread_count e last_message com exatidão para cada conversa
     return result.map(conv => {
       const msgs = localStore.messages[conv.id] || [];
       const unread = msgs.filter(m => !m.read).length;
-      const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].message : conv.last_message;
+      const lastMsg = msgs.length > 0 ? (msgs[msgs.length - 1].content || msgs[msgs.length - 1].message) : conv.last_message;
       return {
         ...conv,
+        subject: conv.subject || conv.title,
         last_message: lastMsg,
         unread_count: unread,
       };
-    });
+    }).sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime());
   },
 
   async getConversationById(id: string): Promise<Conversation | null> {
@@ -1657,6 +1741,24 @@ export const DataService = {
   async getConversationByOccurrenceId(occurrenceId: string): Promise<Conversation | null> {
     const convs = await this.getConversations();
     return convs.find(c => c.occurrence_id === occurrenceId) || null;
+  },
+
+  async getOrCreateOccurrenceConversation(
+    occurrenceId: string,
+    dto: Partial<CreateConversationDTO> & { apartment_id?: string; apartment_number?: string; condominium_id?: string }
+  ): Promise<Conversation> {
+    const existing = await this.getConversationByOccurrenceId(occurrenceId);
+    if (existing) {
+      return existing;
+    }
+    return this.createConversation({
+      ...dto,
+      occurrence_id: occurrenceId,
+      type: 'ocorrencia',
+      title: dto.title || dto.subject || `Ocorrência #${occurrenceId.slice(0, 8)}`,
+      subject: dto.subject || dto.title || `Ocorrência #${occurrenceId.slice(0, 8)}`,
+      initial_message: dto.initial_message,
+    });
   },
 
   async createConversation(dto: CreateConversationDTO): Promise<Conversation> {
@@ -1727,6 +1829,7 @@ export const DataService = {
   },
 
   async getMessages(conversationId: string): Promise<ConversationMessage[]> {
+    let rawList: any[] = [];
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
@@ -1739,17 +1842,47 @@ export const DataService = {
           const supaIds = new Set(data.map(m => m.id));
           const localMsgs = localStore.messages[conversationId] || [];
           const localOnly = localMsgs.filter(lm => !supaIds.has(lm.id));
-          const merged = [...data, ...localOnly];
-          localStore.messages[conversationId] = merged;
-          localStore.saveMessages();
-          return merged;
+          rawList = [...data, ...localOnly];
         }
       } catch (e) {
         console.warn('Erro ao carregar mensagens do Supabase:', e);
       }
     }
 
-    return localStore.messages[conversationId] || [];
+    if (rawList.length === 0) {
+      rawList = localStore.messages[conversationId] || [];
+    }
+
+    // Normalização estrita: garante message, content e sender_role sempre preenchidos
+    const normalized: ConversationMessage[] = rawList.map((m: any) => {
+      const msgText = m.message || m.content || '';
+      let role: 'syndic' | 'resident' = m.sender_role;
+      if (!role || (role !== 'syndic' && role !== 'resident')) {
+        const name = (m.sender_name || '').toLowerCase();
+        const id = (m.sender_id || '').toLowerCase();
+        if (name.includes('morador') || id.includes('morador')) {
+          role = 'resident';
+        } else {
+          role = 'syndic';
+        }
+      }
+      return {
+        id: m.id,
+        conversation_id: m.conversation_id || conversationId,
+        sender_id: m.sender_id,
+        recipient_id: m.recipient_id,
+        sender_name: m.sender_name || (role === 'syndic' ? 'Síndico Geral' : 'Morador'),
+        sender_role: role,
+        message: msgText,
+        content: msgText,
+        read: Boolean(m.read),
+        created_at: m.created_at || new Date().toISOString(),
+      };
+    }).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+    localStore.messages[conversationId] = normalized;
+    localStore.saveMessages();
+    return normalized;
   },
 
   async sendMessage(dto: SendMessageDTO): Promise<ConversationMessage> {
@@ -1759,13 +1892,24 @@ export const DataService = {
 
     const now = new Date().toISOString();
     const msgText = dto.message || dto.content || '';
+    let role: 'syndic' | 'resident' = dto.sender_role || 'syndic';
+    if (!dto.sender_role) {
+      const name = (dto.sender_name || '').toLowerCase();
+      const id = (dto.sender_id || '').toLowerCase();
+      if (name.includes('morador') || id.includes('morador')) {
+        role = 'resident';
+      } else {
+        role = 'syndic';
+      }
+    }
+
     const newMsg: ConversationMessage = {
       id: generatedId,
       conversation_id: dto.conversation_id,
       sender_id: dto.sender_id,
       recipient_id: dto.recipient_id,
       sender_name: dto.sender_name,
-      sender_role: dto.sender_role || (dto.sender_name.toLowerCase().includes('síndico') ? 'syndic' : 'resident'),
+      sender_role: role,
       message: msgText,
       content: msgText,
       read: false,
@@ -1780,6 +1924,7 @@ export const DataService = {
           sender_id: newMsg.sender_id || null,
           recipient_id: newMsg.recipient_id || null,
           sender_name: newMsg.sender_name,
+          sender_role: newMsg.sender_role,
           message: newMsg.message,
           read: false,
           created_at: newMsg.created_at,
@@ -1850,10 +1995,10 @@ export const DataService = {
       const msgs = localStore.messages[conv.id] || [];
       if (isSyndic) {
         // Mensagens não lidas enviadas por moradores
-        totalUnread += msgs.filter(m => !m.read && m.sender_name !== 'Carlos Síndico Geral' && !m.sender_name.toLowerCase().includes('síndico')).length;
+        totalUnread += msgs.filter(m => !m.read && (m.sender_role === 'resident' || (!m.sender_role && !m.sender_name.toLowerCase().includes('síndico')))).length;
       } else {
         // Mensagens não lidas enviadas pela administração
-        totalUnread += msgs.filter(m => !m.read && (m.sender_name.toLowerCase().includes('síndico') || m.sender_name.toLowerCase().includes('administração'))).length;
+        totalUnread += msgs.filter(m => !m.read && (m.sender_role === 'syndic' || m.sender_name.toLowerCase().includes('síndico') || m.sender_name.toLowerCase().includes('administração'))).length;
       }
     }
     return totalUnread;

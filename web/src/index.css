@@ -77,3 +77,53 @@
 .critical-pulse {
   animation: radar-pulse 1.8s infinite;
 }
+
+/* ==========================================================================
+   ESTILOS DEDICADOS PARA IMPRESSÃO EXCLUSIVA DO BOLETO FICTÍCIO
+   Garante que SOMENTE o elemento #printable-boleto-area seja impresso,
+   ocultando 100% de sidebar, navbar, fundos escuros, menus e outros elementos.
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Oculta toda a aplicação */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Torna visível estritamente o contêiner do boleto fictício */
+  #printable-boleto-area,
+  #printable-boleto-area * {
+    visibility: visible !important;
+  }
+
+  #printable-boleto-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    z-index: 999999 !important;
+  }
+
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+

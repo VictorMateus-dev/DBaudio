@@ -34,6 +34,7 @@ import {
 import { Apartment, Alert, Occurrence, SimulatedFine, OccurrenceStatus, Conversation, ConversationMessage } from '../types/database.types';
 import { DataService, localStore } from '../lib/dataService';
 import { useAuth } from '../contexts/AuthContext';
+import { PrintableBoleto } from '../components/PrintableBoleto';
 
 interface ResidentMobileViewProps {
   apartment?: Apartment | null;
@@ -576,7 +577,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                                 ? 'bg-blue-600 text-white rounded-tr-none shadow-sm'
                                 : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'
                             }`}>
-                              <p className="whitespace-pre-wrap">{msg.content}</p>
+                              <p className="whitespace-pre-wrap">{msg.content || msg.message}</p>
                             </div>
                           </div>
                         );
@@ -869,56 +870,81 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                         <span className="text-[10px] text-amber-400 font-semibold">Boleto Simulado</span>
                       </div>
 
-                      {unitFines.map(fine => (
-                        <div key={fine.id} className="p-3 bg-slate-950/80 border border-red-500/30 rounded-xl space-y-2">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 mb-1">
-                                <span>Doc. de Cobrança Simulado</span>
+                      {unitFines.map(fine => {
+                        const isCancelled = fine.status === 'cancelada';
+                        const isPaid = fine.status === 'paga';
+                        return (
+                          <div key={fine.id} className={`p-3 bg-slate-950/80 rounded-xl space-y-2 border ${
+                            isCancelled
+                              ? 'border-slate-800 opacity-80'
+                              : isPaid
+                              ? 'border-emerald-500/30'
+                              : 'border-red-500/30'
+                          }`}>
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase mb-1 ${
+                                  isCancelled
+                                    ? 'bg-slate-800 text-slate-400 border border-slate-700'
+                                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                }`}>
+                                  <span>{isCancelled ? 'Cobrança Cancelada' : 'Doc. de Cobrança Simulado'}</span>
+                                </div>
+                                <h4 className="font-bold text-white text-xs">{fine.reason}</h4>
+                                <p className="text-[10px] text-slate-400">Vencimento: {new Date(fine.due_date).toLocaleDateString('pt-BR')}</p>
+                                {isCancelled && fine.cancellation_reason && (
+                                  <p className="text-[10px] text-red-400 italic pt-1">
+                                    Motivo do cancelamento: {fine.cancellation_reason}
+                                  </p>
+                                )}
                               </div>
-                              <h4 className="font-bold text-white text-xs">{fine.reason}</h4>
-                              <p className="text-[10px] text-slate-400">Vencimento: {new Date(fine.due_date).toLocaleDateString('pt-BR')}</p>
+                              <div className="text-right">
+                                <span className={`text-base font-extrabold font-mono ${
+                                  isCancelled ? 'text-slate-500 line-through' : isPaid ? 'text-emerald-400' : 'text-red-400'
+                                }`}>
+                                  R$ {fine.amount.toFixed(2)}
+                                </span>
+                                <span className={`block text-[9px] font-bold uppercase ${
+                                  isPaid 
+                                    ? 'text-emerald-400' 
+                                    : isCancelled 
+                                    ? 'text-red-400 font-black' 
+                                    : 'text-amber-400'
+                                }`}>
+                                  {isPaid ? 'Liquidada' : isCancelled ? 'CANCELADA' : 'Pendente'}
+                                </span>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <span className="text-base font-extrabold text-emerald-400 font-mono">
-                                R$ {fine.amount.toFixed(2)}
-                              </span>
-                              <span className={`block text-[9px] font-bold uppercase ${
-                                fine.status === 'paga' ? 'text-emerald-400' : 'text-amber-400'
-                              }`}>
-                                {fine.status === 'paga' ? 'Liquidada' : 'Pendente'}
-                              </span>
+
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedFineForModal(fine)}
+                                className="py-2 px-2.5 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-violet-300 font-semibold text-[10px] flex items-center justify-center gap-1 transition"
+                              >
+                                <FileText className="w-3 h-3" />
+                                <span>Ver Boleto</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const linkedOcc = allOccurrencesList.find(o => o.id === fine.occurrence_id);
+                                  if (linkedOcc) {
+                                    handleOpenConversationByOccurrence(linkedOcc);
+                                  } else {
+                                    setActiveTab('messages');
+                                  }
+                                }}
+                                className="py-2 px-2.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 font-semibold text-[10px] flex items-center justify-center gap-1 transition"
+                              >
+                                <MessageSquare className="w-3 h-3" />
+                                <span>Falar com Síndico</span>
+                              </button>
                             </div>
                           </div>
-
-                          <div className="grid grid-cols-2 gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedFineForModal(fine)}
-                              className="py-2 px-2.5 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-violet-300 font-semibold text-[10px] flex items-center justify-center gap-1 transition"
-                            >
-                              <FileText className="w-3 h-3" />
-                              <span>Boleto Simulado</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const linkedOcc = allOccurrencesList.find(o => o.id === fine.occurrence_id);
-                                if (linkedOcc) {
-                                  handleOpenConversationByOccurrence(linkedOcc);
-                                } else {
-                                  setActiveTab('messages');
-                                }
-                              }}
-                              className="py-2 px-2.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 font-semibold text-[10px] flex items-center justify-center gap-1 transition"
-                            >
-                              <MessageSquare className="w-3 h-3" />
-                              <span>Falar com Síndico</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
@@ -1207,127 +1233,10 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
 
         {/* Modal de Visualização de Documento de Cobrança / Boleto SIMULADO */}
         {selectedFineForModal && (
-          <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-3 z-50 overflow-y-auto">
-            <div className="bg-slate-900 border border-violet-500/40 rounded-3xl p-4 text-xs space-y-3.5 shadow-2xl max-w-sm w-full my-auto animate-fadeIn">
-              
-              {/* Simulation Warning Banner */}
-              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
-                <span className="font-semibold leading-tight">DOCUMENTO DE COBRANÇA SIMULADO (AMBIENTE DE TESTE)</span>
-              </div>
-
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-400 flex items-center justify-center">
-                    <Building2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-white text-xs">dBSound Condomínio</h4>
-                    <p className="text-[10px] text-slate-400">Notificação e Cobrança Fictícia</p>
-                  </div>
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => setSelectedFineForModal(null)}
-                  className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                <div className="flex justify-between text-slate-400">
-                  <span>Unidade Notificada:</span>
-                  <strong className="text-white font-mono">Apto {effectiveApt.number}</strong>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span>Vencimento:</span>
-                  <strong className="text-amber-400 font-mono">{new Date(selectedFineForModal.due_date).toLocaleDateString('pt-BR')}</strong>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span>Valor da Multa:</span>
-                  <strong className="text-emerald-400 font-mono text-sm">R$ {selectedFineForModal.amount.toFixed(2)}</strong>
-                </div>
-                <div className="flex justify-between text-slate-400">
-                  <span>Situação Atual:</span>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                    selectedFineForModal.status === 'paga' 
-                      ? 'bg-emerald-500/20 text-emerald-400' 
-                      : 'bg-amber-500/20 text-amber-400'
-                  }`}>
-                    {selectedFineForModal.status === 'paga' ? 'Liquidada' : 'Aguardando Pagamento'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Barcode line */}
-              <div className="space-y-1">
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                  Linha Digitável do Boleto Simulado
-                </span>
-                <div className="p-2 bg-slate-950 border border-slate-800 rounded-lg flex items-center justify-between gap-2">
-                  <code className="text-[10px] text-slate-300 font-mono break-all leading-none">
-                    {selectedFineForModal.barcode_line || '34191.09008 00000.123456 78901.234567 8 98760000050000'}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyBarcode(selectedFineForModal.barcode_line || '34191.09008 00000.123456 78901.234567 8 98760000050000')}
-                    className="p-1.5 rounded bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 shrink-0"
-                    title="Copiar linha digitável"
-                  >
-                    {copiedBarcode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* PIX */}
-              <div className="space-y-1">
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                  Chave / Payload PIX Copia e Cola
-                </span>
-                <div className="p-2 bg-slate-950 border border-slate-800 rounded-lg flex items-center justify-between gap-2">
-                  <code className="text-[10px] text-slate-300 font-mono truncate">
-                    {selectedFineForModal.pix_payload || '00020126580014BR.GOV.BCB.PIX...'}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyPix(selectedFineForModal.pix_payload || '00020126580014BR.GOV.BCB.PIX...')}
-                    className="p-1.5 rounded bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 shrink-0"
-                    title="Copiar PIX"
-                  >
-                    {copiedPix ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-[10px] text-slate-400 space-y-1">
-                <span className="text-white font-semibold block">Motivo da Aplicação:</span>
-                <p>{selectedFineForModal.reason}</p>
-                {selectedFineForModal.regimental_observation && (
-                  <p className="text-slate-500 italic mt-1">{selectedFineForModal.regimental_observation}</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Imprimir</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedFineForModal(null)}
-                  className="py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition"
-                >
-                  Fechar
-                </button>
-              </div>
-
-            </div>
-          </div>
+          <PrintableBoleto
+            fine={selectedFineForModal}
+            onClose={() => setSelectedFineForModal(null)}
+          />
         )}
 
         {/* Modal de Alerta Crítico (Exato Requisito 23) */}

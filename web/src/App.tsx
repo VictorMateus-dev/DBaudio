@@ -10,6 +10,7 @@ import { DevicesPage } from './pages/DevicesPage';
 import { PoliciesPage } from './pages/PoliciesPage';
 import { ResidentsManagementPage } from './pages/ResidentsManagementPage';
 import { SimulatorLabPage } from './pages/SimulatorLabPage';
+import { MessagesManagementPage } from './pages/MessagesManagementPage';
 import { ResidentMobileView } from './pages/ResidentMobileView';
 import { LoginPage } from './pages/LoginPage';
 import { useAuth } from './contexts/AuthContext';
@@ -98,12 +99,14 @@ interface SindicoLayoutProps {
   alerts: Alert[];
   occurrences: Occurrence[];
   pendingResidentsCount: number;
+  unreadMessagesCount: number;
 }
 
 const SindicoLayout: React.FC<SindicoLayoutProps> = ({
   alerts,
   occurrences,
   pendingResidentsCount,
+  unreadMessagesCount,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -115,6 +118,7 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
   else if (path.includes('/sindico/apartamentos')) currentTab = 'floorplan';
   else if (path.includes('/sindico/moradores')) currentTab = 'residents';
   else if (path.includes('/sindico/ocorrencias')) currentTab = 'occurrences';
+  else if (path.includes('/sindico/mensagens')) currentTab = 'messages';
   else if (path.includes('/sindico/dispositivos')) currentTab = 'devices';
   else if (path.includes('/sindico/politicas')) currentTab = 'policies';
   else if (path.includes('/sindico/simulador')) currentTab = 'simulator';
@@ -126,6 +130,7 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
       case 'floorplan': navigate('/sindico/apartamentos'); break;
       case 'residents': navigate('/sindico/moradores'); break;
       case 'occurrences': navigate('/sindico/ocorrencias'); break;
+      case 'messages': navigate('/sindico/mensagens'); break;
       case 'devices': navigate('/sindico/dispositivos'); break;
       case 'policies': navigate('/sindico/politicas'); break;
       case 'simulator': navigate('/sindico/simulador'); break;
@@ -141,6 +146,7 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
         openAlertsCount={alerts.filter(a => !a.read).length}
         openOccurrencesCount={occurrences.filter(o => o.status === 'aberta').length}
         pendingResidentsCount={pendingResidentsCount}
+        unreadMessagesCount={unreadMessagesCount}
       />
 
       {/* Área principal do Síndico */}
@@ -173,9 +179,10 @@ export const App: React.FC = () => {
   const [policies, setPolicies] = useState<NoisePolicy[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [simulatorAptId, setSimulatorAptId] = useState<string | undefined>(undefined);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
 
   const loadAllData = async () => {
-    const [apts, devs, sens, alts, occs, pols, profs] = await Promise.all([
+    const [apts, devs, sens, alts, occs, pols, profs, unreadMsgs] = await Promise.all([
       DataService.getApartments(),
       DataService.getDevices(),
       DataService.getSensors(),
@@ -183,6 +190,7 @@ export const App: React.FC = () => {
       DataService.getOccurrences(),
       DataService.getPolicies(),
       DataService.getProfiles(),
+      DataService.getUnreadMessagesCount(undefined, true),
     ]);
     setApartments([...apts]);
     setDevices([...devs]);
@@ -191,6 +199,7 @@ export const App: React.FC = () => {
     setOccurrences([...occs]);
     setPolicies([...pols]);
     setProfiles([...profs]);
+    setUnreadMessagesCount(unreadMsgs);
   };
 
   useEffect(() => {
@@ -203,7 +212,7 @@ export const App: React.FC = () => {
 
     // 2. Sincronização entre abas/janelas via evento 'storage' do navegador
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'dbsound_apartments' || e.key === 'dbsound_allocations' || e.key === 'dbsound_profiles') {
+      if (e.key === 'dbsound_apartments' || e.key === 'dbsound_allocations' || e.key === 'dbsound_profiles' || e.key === 'dbsound_conversations' || e.key === 'dbsound_messages' || e.key === 'dbsound_fines') {
         loadAllData();
       }
     };
@@ -227,6 +236,15 @@ export const App: React.FC = () => {
             loadAllData();
           })
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'noise_readings' }, () => {
+            loadAllData();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
+            loadAllData();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_messages' }, () => {
+            loadAllData();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'fines' }, () => {
             loadAllData();
           })
           .subscribe();
@@ -307,6 +325,7 @@ export const App: React.FC = () => {
               alerts={alerts}
               occurrences={occurrences}
               pendingResidentsCount={pendingResidentsCount}
+              unreadMessagesCount={unreadMessagesCount}
             />
           </ProtectedRoute>
         }
@@ -327,6 +346,7 @@ export const App: React.FC = () => {
                   case 'floorplan': navigate('/sindico/apartamentos'); break;
                   case 'residents': navigate('/sindico/moradores'); break;
                   case 'occurrences': navigate('/sindico/ocorrencias'); break;
+                  case 'messages': navigate('/sindico/mensagens'); break;
                   case 'devices': navigate('/sindico/dispositivos'); break;
                   case 'policies': navigate('/sindico/politicas'); break;
                   case 'simulator': navigate('/sindico/simulador'); break;
@@ -382,6 +402,15 @@ export const App: React.FC = () => {
           element={
             <OccurrencesPage
               occurrences={occurrences}
+              onRefresh={loadAllData}
+            />
+          }
+        />
+
+        <Route
+          path="mensagens"
+          element={
+            <MessagesManagementPage
               onRefresh={loadAllData}
             />
           }

@@ -27,8 +27,11 @@ import {
   ShieldCheck,
   HelpCircle,
   QrCode,
-  X
+  X,
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
+import { PrintableBoleto } from '../components/PrintableBoleto';
 
 interface OccurrencesPageProps {
   occurrences: Occurrence[];
@@ -66,8 +69,14 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [decisionSuccessMsg, setDecisionSuccessMsg] = useState<string | null>(null);
 
+  // Cancelamento de Multa
+  const [isCancelFineModalOpen, setIsCancelFineModalOpen] = useState(false);
+  const [fineToCancel, setFineToCancel] = useState<SimulatedFine | null>(null);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [isCancellingFine, setIsCancellingFine] = useState(false);
+
   // Formulário de Multa
-  const [fineAmount, setFineAmount] = useState<number>(500);
+  const [fineAmount, setFineAmount] = useState<number>(150);
   const [fineDueDate, setFineDueDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 15);
@@ -135,7 +144,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
     setNewCommentText('');
   };
 
-  // Abertura do Chat com o Morador
+  // Abertura do Chat com o Morador (REUTILIZA CONVERSA EXISTENTE)
   const handleOpenOccurrenceChat = async () => {
     if (!selectedOccurrence) return;
 
@@ -148,23 +157,52 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
       if (foundApt) targetAptId = foundApt.id;
     }
 
-    let conv = await DataService.getConversationByOccurrenceId(selectedOccurrence.id);
-    if (!conv) {
-      conv = await DataService.createConversation({
-        condominium_id: selectedOccurrence.condominium_id || user?.condominium_id || '00000000-0000-0000-0000-000000000001',
-        apartment_id: targetAptId || undefined,
-        occurrence_id: selectedOccurrence.id,
-        type: 'ocorrencia',
-        subject: `Ocorrência #${selectedOccurrence.id.slice(0, 8)} • ${selectedOccurrence.type}`,
-        initial_message: `Olá! Entramos em contato referente à ocorrência registrada sobre "${selectedOccurrence.type}" na unidade ${selectedOccurrence.apartment_number || selectedOccurrence.location}. Gostaríamos de orientar a respeito das regras de convivência acústica do condomínio e solicitar adequação dos níveis de ruído.`,
-      });
-    }
+    // Reutiliza a conversa se já existir para esta ocorrência
+    const conv = await DataService.getOrCreateOccurrenceConversation(selectedOccurrence.id, {
+      condominium_id: selectedOccurrence.condominium_id || user?.condominium_id || '00000000-0000-0000-0000-000000000001',
+      apartment_id: targetAptId || undefined,
+      apartment_number: selectedOccurrence.apartment_number,
+      type: 'ocorrencia',
+      title: `Ocorrência #${selectedOccurrence.id.slice(0, 8)} • ${selectedOccurrence.type}`,
+      subject: `Ocorrência #${selectedOccurrence.id.slice(0, 8)} • ${selectedOccurrence.type}`,
+      initial_message: `Olá! Entramos em contato referente à ocorrência registrada sobre "${selectedOccurrence.type}" na unidade ${selectedOccurrence.apartment_number || selectedOccurrence.location}. Gostaríamos de orientar a respeito das regras de convivência acústica do condomínio e solicitar adequação dos níveis de ruído.`,
+    });
 
     setActiveConversation(conv);
     const msgs = await DataService.getMessages(conv.id);
     setChatMessages(msgs);
     await DataService.markMessagesAsRead(conv.id, user?.id);
     setIsChatModalOpen(true);
+  };
+
+  // Abertura do Modal de Cancelamento de Multa
+  const handleOpenCancelModal = (fine: SimulatedFine) => {
+    setFineToCancel(fine);
+    setCancellationReason('');
+    setIsCancelFineModalOpen(true);
+  };
+
+  // Confirmação de Cancelamento de Multa com Auditoria
+  const handleConfirmCancelFine = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fineToCancel || !cancellationReason.trim() || isCancellingFine) return;
+
+    setIsCancellingFine(true);
+    try {
+      await DataService.cancelFine({
+        fine_id: fineToCancel.id,
+        cancellation_reason: cancellationReason.trim(),
+        cancelled_by: user?.full_name || 'Síndico Geral',
+      });
+      setIsCancelFineModalOpen(false);
+      setFineToCancel(null);
+      setDecisionSuccessMsg(`Multa ${fineToCancel.fine_number} cancelada com sucesso no sistema!`);
+      setTimeout(() => setDecisionSuccessMsg(null), 4000);
+      await loadData();
+      onRefresh();
+    } finally {
+      setIsCancellingFine(false);
+    }
   };
 
   const handleSendChatMessage = async (e: React.FormEvent) => {
@@ -819,13 +857,23 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
 
               {/* CARD DE MULTA EXISTENTE (se houver multa associada) */}
               {linkedFine && (
-                <div className="p-4 rounded-2xl bg-red-950/20 border border-red-500/30 flex items-center justify-between gap-4">
+                <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                  linkedFine.status === 'cancelada'
+                    ? 'bg-slate-900/60 border-slate-700/50'
+                    : linkedFine.status === 'paga'
+                    ? 'bg-emerald-950/20 border-emerald-500/30'
+                    : 'bg-red-950/20 border-red-500/30'
+                }`}>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-red-400" />
+                      <DollarSign className={`w-4 h-4 ${linkedFine.status === 'cancelada' ? 'text-slate-400' : 'text-red-400'}`} />
                       <span className="font-bold text-xs text-white">Multa Aplicada: {linkedFine.fine_number}</span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        linkedFine.status === 'paga' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                        linkedFine.status === 'paga' 
+                          ? 'bg-emerald-500/20 text-emerald-300' 
+                          : linkedFine.status === 'cancelada'
+                          ? 'bg-slate-700/50 text-slate-300 border border-slate-600'
+                          : 'bg-amber-500/20 text-amber-300'
                       }`}>
                         STATUS: {linkedFine.status.toUpperCase()}
                       </span>
@@ -833,11 +881,17 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                     <p className="text-[11px] text-slate-300">
                       Valor: <strong>R$ {linkedFine.amount.toFixed(2)}</strong> • Vencimento: {new Date(linkedFine.due_date).toLocaleDateString('pt-BR')}
                     </p>
+                    {linkedFine.status === 'cancelada' && linkedFine.cancellation_reason && (
+                      <p className="text-[10px] text-red-400 italic pt-0.5">
+                        Cancelada em {linkedFine.cancelled_at ? new Date(linkedFine.cancelled_at).toLocaleDateString('pt-BR') : ''}: {linkedFine.cancellation_reason}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {linkedFine.status !== 'paga' && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {linkedFine.status === 'pendente' && (
                       <button
+                        type="button"
                         onClick={() => handleSimulatePayment(linkedFine.id)}
                         className="px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition flex items-center gap-1"
                         title="Simular baixa do pagamento para demonstração"
@@ -847,6 +901,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                       </button>
                     )}
                     <button
+                      type="button"
                       onClick={() => {
                         setActiveFineToView(linkedFine);
                         setIsBillingDocModalOpen(true);
@@ -856,6 +911,17 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                       <FileText className="w-3.5 h-3.5" />
                       <span>Visualizar Documento</span>
                     </button>
+                    {linkedFine.status !== 'cancelada' && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCancelModal(linkedFine)}
+                        className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-semibold transition flex items-center gap-1"
+                        title="Cancelar multa com registro em ata/auditoria"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Cancelar Multa</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1020,125 +1086,72 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
       {/* MODAL: DOCUMENTO DE COBRANÇA / BOLETO SIMULADO */}
       {/* ========================================================================= */}
       {isBillingDocModalOpen && activeFineToView && (
+        <PrintableBoleto
+          fine={activeFineToView}
+          onClose={() => setIsBillingDocModalOpen(false)}
+          onSimulatePayment={handleSimulatePayment}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: CANCELAR MULTA SIMULADA (COM AUDITORIA) */}
+      {/* ========================================================================= */}
+      {isCancelFineModalOpen && fineToCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-          <div className="bg-white text-slate-900 rounded-3xl p-6 md:p-8 w-full max-w-2xl space-y-6 shadow-2xl relative overflow-hidden border border-slate-200">
-            {/* Watermark Banner */}
-            <div className="absolute top-2 right-4 text-[10px] font-mono uppercase tracking-widest text-red-600 font-black border border-red-400/30 px-2 py-0.5 rounded bg-red-50">
-              DOCUMENTO DE COBRANÇA — SIMULAÇÃO
+          <div className="vault-card rounded-3xl p-6 w-full max-w-md space-y-4 border border-red-500/30 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2 text-red-400">
+                <Trash2 className="w-5 h-5" />
+                <h3 className="text-base font-bold text-white">Cancelar Multa Simulada</h3>
+              </div>
+              <button
+                onClick={() => setIsCancelFineModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 text-xs"
+              >
+                ✕
+              </button>
             </div>
 
-            {/* Header */}
-            <div className="flex items-start justify-between border-b pb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-violet-600 text-white flex items-center justify-center font-black text-xs">
-                    dB
-                  </div>
-                  <h2 className="text-xl font-black tracking-tight text-slate-900">dBSound • Condomínio Inteligente</h2>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">Residencial Parque das Flores • CNPJ: 00.000.000/0001-00</p>
-              </div>
-
-              <div className="text-right">
-                <span className="text-xs font-mono font-bold text-slate-700 block">{activeFineToView.fine_number}</span>
-                <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-                  activeFineToView.status === 'paga' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                }`}>
-                  STATUS: {activeFineToView.status.toUpperCase()}
-                </span>
-              </div>
+            <div className="p-3.5 rounded-xl bg-red-950/20 border border-red-500/20 text-xs text-red-300 space-y-1.5">
+              <p>
+                Você está cancelando a multa <strong>{fineToCancel.fine_number}</strong> no valor de <strong>R$ {fineToCancel.amount.toFixed(2)}</strong> da unidade {fineToCancel.apartment_number ? `Apto ${fineToCancel.apartment_number}` : ''}.
+              </p>
+              <p className="text-[11px] text-slate-400">
+                O cancelamento será registrado na auditoria com data, responsável e justificativa. O morador da unidade receberá uma notificação informando o cancelamento.
+              </p>
             </div>
 
-            {/* Ficha de Compensação Visual */}
-            <div className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 font-mono">
-                <div>
-                  <span className="text-[10px] text-slate-500 uppercase block">Sacado / Unidade</span>
-                  <strong className="text-slate-900 text-xs">Apto {activeFineToView.apartment_number || '101'}</strong>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-500 uppercase block">Data de Emissão</span>
-                  <strong className="text-slate-900 text-xs">{new Date(activeFineToView.issue_date).toLocaleDateString('pt-BR')}</strong>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-500 uppercase block">Vencimento</span>
-                  <strong className="text-red-600 text-xs font-black">{new Date(activeFineToView.due_date).toLocaleDateString('pt-BR')}</strong>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-500 uppercase block">Valor do Documento</span>
-                  <strong className="text-slate-900 text-sm font-black">R$ {activeFineToView.amount.toFixed(2)}</strong>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-bold block">Motivo da Penalidade Acústica:</span>
-                <p className="text-xs text-slate-800 font-medium leading-relaxed">{activeFineToView.reason}</p>
-                {activeFineToView.syndic_notes && (
-                  <p className="text-[11px] text-slate-500 italic mt-1">Obs: {activeFineToView.syndic_notes}</p>
-                )}
-              </div>
-
-              {/* Linha Digitável e Código de Barras Fictício */}
-              <div className="space-y-2 pt-2 border-t">
-                <div className="flex items-center justify-between text-[11px] font-mono bg-slate-100 p-2.5 rounded-lg border border-slate-300 select-all">
-                  <span className="font-bold text-slate-800">{activeFineToView.barcode}</span>
-                  <span className="text-[9px] text-slate-500 uppercase">Linha Digitável Simulada</span>
-                </div>
-
-                {/* Código de barras estilizado em SVG */}
-                <div className="p-3 bg-white border border-slate-300 rounded-lg flex items-center justify-center">
-                  <div className="flex items-center gap-[2px] h-12 w-full max-w-md justify-center">
-                    {Array.from({ length: 55 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="bg-slate-900 h-full"
-                        style={{ width: i % 3 === 0 ? '4px' : i % 2 === 0 ? '2px' : '1px' }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Legal Disclaimer */}
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-800 space-y-0.5">
-                <strong className="block">AVISO LEGAL OBRIGATÓRIO:</strong>
-                <p>
-                  Este documento é uma <strong>representação simulada de cobrança</strong> desenvolvida com propósitos acadêmicos e demonstrativos do sistema dBSound. Não utilize este código ou documento para transações bancárias.
-                </p>
-              </div>
+            <div className="space-y-1.5 text-xs">
+              <label className="text-slate-300 font-semibold block">
+                Motivo do Cancelamento: *
+              </label>
+              <textarea
+                rows={3}
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                placeholder="Descreva o motivo do cancelamento (ex: Acordo entre as partes, aferição revista, tolerância concedida)..."
+                required
+                className="w-full bg-space-950 border border-white/15 rounded-xl p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 resize-none text-xs"
+              />
             </div>
 
-            {/* Bottom Actions */}
-            <div className="flex items-center justify-between pt-2 border-t">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
               <button
                 type="button"
-                onClick={() => setIsBillingDocModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900"
+                onClick={() => setIsCancelFineModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold"
               >
-                Fechar Visualizador
+                Voltar
               </button>
-
-              <div className="flex items-center gap-2">
-                {activeFineToView.status !== 'paga' && (
-                  <button
-                    type="button"
-                    onClick={() => handleSimulatePayment(activeFineToView.id)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition flex items-center gap-1.5"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Simular Pagamento (Baixa)</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow transition flex items-center gap-1.5"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Imprimir</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                disabled={isCancellingFine || !cancellationReason.trim()}
+                onClick={handleConfirmCancelFine}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold text-xs shadow-glow-red transition flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isCancellingFine ? 'Cancelando...' : 'Confirmar Cancelamento'}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1323,7 +1336,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                             : 'bg-space-900 border border-white/10 text-slate-200 rounded-tl-none'
                         }`}
                       >
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        <p className="whitespace-pre-wrap">{msg.content || msg.message}</p>
                       </div>
 
                       <div className="text-[9px] text-slate-500 mt-0.5 flex items-center gap-1">

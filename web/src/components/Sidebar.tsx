@@ -9,11 +9,12 @@ import {
   Volume2, 
   Users,
   LogOut,
-  UserCheck
+  UserCheck,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-export type NavTab = 'overview' | 'floorplan' | 'residents' | 'occurrences' | 'devices' | 'policies' | 'simulator';
+export type NavTab = 'overview' | 'floorplan' | 'residents' | 'occurrences' | 'messages' | 'devices' | 'policies' | 'simulator';
 
 interface SidebarProps {
   currentTab: NavTab;
@@ -21,6 +22,7 @@ interface SidebarProps {
   openAlertsCount: number;
   openOccurrencesCount: number;
   pendingResidentsCount?: number;
+  unreadMessagesCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -29,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   openAlertsCount,
   openOccurrencesCount,
   pendingResidentsCount = 0,
+  unreadMessagesCount = 0,
 }) => {
   const { role, switchRole, user, logout } = useAuth();
 
@@ -37,6 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'floorplan' as NavTab, label: 'Planta das Unidades', icon: Grid3X3 },
     { id: 'residents' as NavTab, label: 'Moradores & Unidades', icon: Users, badge: pendingResidentsCount, badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
     { id: 'occurrences' as NavTab, label: 'Ocorrências', icon: AlertTriangle, badge: openOccurrencesCount, badgeColor: 'bg-red-500/20 text-red-300 border-red-500/30' },
+    { id: 'messages' as NavTab, label: 'Central de Mensagens', icon: MessageSquare, badge: unreadMessagesCount, badgeColor: 'bg-red-500/20 text-red-300 border-red-500/30' },
     { id: 'devices' as NavTab, label: 'Dispositivos ESP32', icon: Cpu },
     { id: 'policies' as NavTab, label: 'Políticas de Ruído', icon: Sliders },
     { id: 'simulator' as NavTab, label: 'Laboratório & Testes', icon: FlaskConical, highlight: true },

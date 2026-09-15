@@ -666,6 +666,10 @@ CREATE TABLE IF NOT EXISTS public.fines (
     qr_code_pix TEXT,
     provider TEXT NOT NULL DEFAULT 'simulated',
     paid_at TIMESTAMPTZ,
+    cancelled_at TIMESTAMPTZ,
+    cancelled_by TEXT,
+    cancellation_reason TEXT,
+    previous_status TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -721,6 +725,7 @@ CREATE TABLE IF NOT EXISTS public.conversation_messages (
     sender_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     recipient_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     sender_name TEXT NOT NULL,
+    sender_role TEXT NOT NULL DEFAULT 'syndic' CHECK (sender_role IN ('syndic', 'resident')),
     message TEXT NOT NULL,
     read BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()

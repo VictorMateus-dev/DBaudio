@@ -180,6 +180,10 @@ export interface SimulatedFine {
   pix_payload?: string;
   provider: string;
   paid_at?: string;
+  cancelled_at?: string;
+  cancelled_by?: string;
+  cancellation_reason?: string;
+  previous_status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -192,6 +196,12 @@ export interface CreateFineDTO {
   amount: number;
   due_date: string;
   syndic_notes?: string;
+}
+
+export interface CancelFineDTO {
+  fine_id: string;
+  cancellation_reason: string;
+  cancelled_by?: string;
 }
 
 export interface OccurrenceComment {
@@ -229,9 +239,9 @@ export interface ConversationMessage {
   sender_id?: string;
   recipient_id?: string;
   sender_name: string;
-  sender_role?: 'syndic' | 'resident';
+  sender_role: 'syndic' | 'resident';
   message: string;
-  content?: string;
+  content: string;
   read: boolean;
   created_at: string;
 }
