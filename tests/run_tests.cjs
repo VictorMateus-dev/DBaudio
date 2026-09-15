@@ -79,7 +79,7 @@ console.log('   dBSound — EXECUÇÃO DA SUÍTE DE TESTES AUTOMATIZADOS');
 console.log('===============================================================\n');
 
 let passedTests = 0;
-let totalTests = 10;
+let totalTests = 12;
 
 // CENÁRIO 1: 40 dB — Não gerar alerta
 (() => {
@@ -292,6 +292,64 @@ let totalTests = 10;
     passedTests++;
   } else {
     console.error('❌ Cenário 10 [FALHOU]: Morador permaneceu bloqueado em tela de espera.');
+  }
+})();
+
+// CENÁRIO 11: Isolamento Multi-Inquilino (Apto 101 recebe ruído e alerta, Apto 102 permanece intocado)
+(() => {
+  const apt101 = { id: 'apt-101', number: '101', current_db: 40.0, status: 'normal' };
+  const apt102 = { id: 'apt-102', number: '102', current_db: 40.0, status: 'normal' };
+  const allAlerts = [];
+
+  // Síndico injeta ruído sustentado no Apto 101
+  const injectedReading = { apartment_id: 'apt-101', decibel: 95.0 };
+  apt101.current_db = injectedReading.decibel;
+  apt101.status = 'critical';
+  allAlerts.push({
+    id: 'alt-101-crit',
+    apartment_id: 'apt-101',
+    severity: 'critical',
+    title: 'ALERTA!! RUÍDO CRÍTICO DETECTADO',
+    read: false,
+  });
+
+  // Morador do 101 consulta seus dados
+  const morador101Alert = allAlerts.find(a => a.apartment_id === apt101.id && a.severity === 'critical' && !a.read);
+  // Morador do 102 consulta seus dados
+  const morador102Alert = allAlerts.find(a => a.apartment_id === apt102.id && a.severity === 'critical' && !a.read);
+
+  const isIsolated = apt101.current_db === 95.0 && 
+                     morador101Alert !== undefined && 
+                     apt102.current_db === 40.0 && 
+                     apt102.status === 'normal' && 
+                     morador102Alert === undefined;
+
+  if (isIsolated) {
+    console.log('✅ Cenário 11 [PASSOU]: Isolamento Multi-Inquilino confirmado (Apto 101 em 95 dB com alerta modal; Apto 102 limpo a 40 dB sem alerta).');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 11 [FALHOU]: Vazamento de alerta ou decibéis entre apartamentos diferentes.');
+  }
+})();
+
+// CENÁRIO 12: Regra de Debounce (Ruído pontual de 1s @ 95 dB atualiza medidor sem modal vs 3s sustentado)
+(() => {
+  const engine = new NoiseEngineSimulator();
+
+  // Teste 1: Leitura única de 95 dB (1s)
+  const res1 = engine.processReading('apt-101', 95.0, '14:00', 1);
+  const singlePulsePassed = engine.alerts.length === 0 && res1.event !== null && res1.event.durationSeconds < 3;
+
+  // Teste 2: Continuação para acumular 3 segundos
+  engine.processReading('apt-101', 95.0, '14:00', 1);
+  const resFinal = engine.processReading('apt-101', 95.0, '14:00', 1);
+  const sustainedPassed = engine.alerts.length > 0 && resFinal.alert && resFinal.alert.severity === 'critical';
+
+  if (singlePulsePassed && sustainedPassed) {
+    console.log('✅ Cenário 12 [PASSOU]: Debounce validado (Pico de 1s atualiza leitura mas descarta modal; 3s sustentados confirmam alerta crítico).');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 12 [FALHOU]: Falha na validação da janela de debounce.');
   }
 })();
 

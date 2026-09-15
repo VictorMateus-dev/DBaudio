@@ -48,32 +48,37 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [createdSuccess, setCreatedSuccess] = useState(false);
 
-  // Detecta alerta crítico recente não lido e abre modal automaticamente
-  useEffect(() => {
-    const unreadCritical = alerts.find(a => a.severity === 'critical' && !a.read);
-    if (unreadCritical && !activeModalAlert) {
-      setActiveModalAlert(unreadCritical);
-    }
-  }, [alerts]);
-
   // Unidade efetiva: caso apartment seja nulo, sintetiza com base nos dados do usuário alocado
   const effectiveApt: Apartment = apartment || {
     id: user?.apartment_id || 'unassigned',
     building_id: '00000000-0000-0000-0000-000000000002',
     number: user?.apartment_number || 'Sua Unidade',
     floor: 1,
-    current_db: 42.0,
+    current_db: 40.0,
     status: 'normal',
-    peak_db: 45.0,
-    avg_db: 42.0,
+    peak_db: 40.0,
+    avg_db: 40.0,
     custom_day_threshold_db: 70,
     custom_night_threshold_db: 60,
     custom_critical_threshold_db: 80,
     created_at: user?.created_at || new Date().toISOString(),
   };
 
-  const currentDb = effectiveApt.current_db || 48.0;
+  // Detecta alerta crítico recente não lido estritamente desta unidade e abre modal automaticamente
+  useEffect(() => {
+    const unreadCritical = alerts.find(a => 
+      a.apartment_id === effectiveApt.id && 
+      a.severity === 'critical' && 
+      !a.read
+    );
+    if (unreadCritical && !activeModalAlert) {
+      setActiveModalAlert(unreadCritical);
+    }
+  }, [alerts, effectiveApt.id]);
+
+  const currentDb = effectiveApt.current_db ?? 40.0;
   const status = effectiveApt.status || 'normal';
+  const unitAlerts = alerts.filter(a => a.apartment_id === effectiveApt.id);
 
   const handleDismissAlert = () => {
     if (activeModalAlert) {
@@ -295,11 +300,11 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-xs">
                   <span className="text-slate-400 block mb-1">Média 24h</span>
-                  <span className="text-lg font-bold text-white font-mono">{effectiveApt.avg_db?.toFixed(1) || '46.5'} dB</span>
+                  <span className="text-lg font-bold text-white font-mono">{effectiveApt.avg_db != null ? effectiveApt.avg_db.toFixed(1) : '40.0'} dB</span>
                 </div>
                 <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-xs">
                   <span className="text-slate-400 block mb-1">Último Pico</span>
-                  <span className="text-lg font-bold text-amber-400 font-mono">{effectiveApt.peak_db?.toFixed(1) || '68.2'} dB</span>
+                  <span className="text-lg font-bold text-amber-400 font-mono">{effectiveApt.peak_db != null ? effectiveApt.peak_db.toFixed(1) : '40.0'} dB</span>
                 </div>
               </div>
 
@@ -315,10 +320,10 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
               {/* Recent Alerts List */}
               <div className="space-y-2 pt-2">
                 <span className="text-xs font-bold text-slate-300 block">Alertas Recentes da Unidade</span>
-                {alerts.length === 0 ? (
-                  <p className="text-xs text-slate-500 py-3 text-center">Nenhum ruído anômalo registrado.</p>
+                {unitAlerts.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-3 text-center">Nenhum ruído anômalo registrado nesta unidade.</p>
                 ) : (
-                  alerts.slice(0, 2).map(a => (
+                  unitAlerts.slice(0, 3).map(a => (
                     <div key={a.id} className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl text-xs">
                       <div className="flex justify-between font-bold text-white mb-1">
                         <span className={a.severity === 'critical' ? 'text-red-400' : 'text-amber-400'}>{a.title}</span>
@@ -338,11 +343,11 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
               <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 text-xs space-y-3">
                 <div className="flex justify-between text-slate-400">
                   <span>Pico Máximo Registrado</span>
-                  <strong className="text-amber-400 font-mono">{effectiveApt.peak_db?.toFixed(1) || '84.5'} dB</strong>
+                  <strong className="text-amber-400 font-mono">{effectiveApt.peak_db != null ? effectiveApt.peak_db.toFixed(1) : '40.0'} dB</strong>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Média das últimas 24h</span>
-                  <strong className="text-blue-400 font-mono">{effectiveApt.avg_db?.toFixed(1) || '46.5'} dB</strong>
+                  <strong className="text-blue-400 font-mono">{effectiveApt.avg_db != null ? effectiveApt.avg_db.toFixed(1) : '40.0'} dB</strong>
                 </div>
               </div>
 

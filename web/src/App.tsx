@@ -14,6 +14,7 @@ import { ResidentMobileView } from './pages/ResidentMobileView';
 import { LoginPage } from './pages/LoginPage';
 import { useAuth } from './contexts/AuthContext';
 import { DataService, localStore } from './lib/dataService';
+import { supabase, isSupabaseConfigured } from './lib/supabaseClient';
 import { Apartment, Device, Sensor, Alert, Occurrence, NoisePolicy, Profile } from './types/database.types';
 
 // Componente para proteção de rotas com base em autenticação e papel (RBAC)
@@ -194,10 +195,54 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadAllData();
-    const unsubscribe = localStore.subscribe(() => {
+
+    // 1. Inscrição reativa local (mesma aba/janela)
+    const unsubscribeLocal = localStore.subscribe(() => {
       loadAllData();
     });
-    return unsubscribe;
+
+    // 2. Sincronização entre abas/janelas via evento 'storage' do navegador
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'dbsound_apartments' || e.key === 'dbsound_allocations' || e.key === 'dbsound_profiles') {
+        loadAllData();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    // 3. Heartbeat polling a cada 2.5s para assegurar sincronismo contínuo entre telas
+    const heartbeatInterval = setInterval(() => {
+      loadAllData();
+    }, 2500);
+
+    // 4. Supabase Realtime Channel (quando conectado ao backend remoto)
+    let channel: any = null;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        channel = supabase
+          .channel('schema-db-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'apartments' }, () => {
+            loadAllData();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'alerts' }, () => {
+            loadAllData();
+          })
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'noise_readings' }, () => {
+            loadAllData();
+          })
+          .subscribe();
+      } catch (e) {
+        console.warn('Realtime channel error:', e);
+      }
+    }
+
+    return () => {
+      unsubscribeLocal();
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(heartbeatInterval);
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   const pendingResidentsCount = profiles.filter(p => {
@@ -222,10 +267,10 @@ export const App: React.FC = () => {
         building_id: '00000000-0000-0000-0000-000000000002',
         number: user.apartment_number || '101',
         floor: 1,
-        current_db: 42.0,
+        current_db: 40.0,
         status: 'normal',
-        peak_db: 45.0,
-        avg_db: 42.0,
+        peak_db: 40.0,
+        avg_db: 40.0,
         custom_day_threshold_db: 70,
         custom_night_threshold_db: 60,
         custom_critical_threshold_db: 80,

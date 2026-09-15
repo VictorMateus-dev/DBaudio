@@ -22,21 +22,25 @@ ON CONFLICT (id) DO NOTHING;
 -- 2. GARANTIA DAS UNIDADES BASE (101 a 303) NA TABELA APARTMENTS
 -- ---------------------------------------------------------------------
 ALTER TABLE public.apartments 
+    ADD COLUMN IF NOT EXISTS current_db NUMERIC(5, 2) DEFAULT 40.0,
+    ADD COLUMN IF NOT EXISTS peak_db NUMERIC(5, 2) DEFAULT 40.0,
+    ADD COLUMN IF NOT EXISTS avg_db NUMERIC(5, 2) DEFAULT 40.0,
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'normal',
     ADD COLUMN IF NOT EXISTS custom_day_threshold_db NUMERIC DEFAULT 70.0,
     ADD COLUMN IF NOT EXISTS custom_night_threshold_db NUMERIC DEFAULT 60.0,
     ADD COLUMN IF NOT EXISTS custom_critical_threshold_db NUMERIC DEFAULT 80.0;
 
-INSERT INTO public.apartments (id, building_id, number, floor, custom_day_threshold_db, custom_night_threshold_db, custom_critical_threshold_db)
+INSERT INTO public.apartments (id, building_id, number, floor, current_db, peak_db, avg_db, status, custom_day_threshold_db, custom_night_threshold_db, custom_critical_threshold_db)
 VALUES
-    ('10100000-0000-0000-0000-000000000101'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '101', 1, 70.0, 60.0, 80.0),
-    ('10200000-0000-0000-0000-000000000102'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '102', 1, 70.0, 60.0, 80.0),
-    ('10300000-0000-0000-0000-000000000103'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '103', 1, 70.0, 60.0, 80.0),
-    ('20100000-0000-0000-0000-000000000201'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '201', 2, 70.0, 60.0, 80.0),
-    ('20200000-0000-0000-0000-000000000202'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '202', 2, 70.0, 60.0, 80.0),
-    ('20300000-0000-0000-0000-000000000203'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '203', 2, 70.0, 60.0, 80.0),
-    ('30100000-0000-0000-0000-000000000301'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '301', 3, 70.0, 60.0, 80.0),
-    ('30200000-0000-0000-0000-000000000302'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '302', 3, 70.0, 60.0, 80.0),
-    ('30300000-0000-0000-0000-000000000303'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '303', 3, 70.0, 60.0, 80.0)
+    ('10100000-0000-0000-0000-000000000101'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '101', 1, 40.0, 45.0, 40.0, 'normal', 70.0, 60.0, 80.0),
+    ('10200000-0000-0000-0000-000000000102'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '102', 1, 40.0, 45.0, 40.0, 'normal', 70.0, 60.0, 80.0),
+    ('10300000-0000-0000-0000-000000000103'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '103', 1, 40.0, 45.0, 40.0, 'normal', 70.0, 60.0, 80.0),
+    ('20100000-0000-0000-0000-000000000201'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '201', 2, 40.0, 45.0, 40.0, 'normal', 70.0, 60.0, 80.0),
+    ('20200000-0000-0000-0000-000000000202'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '202', 2, 40.0, 45.0, 40.0, 'normal', 70.0, 60.0, 80.0),
+    ('20300000-0000-0000-0000-000000000203'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '203', 2, 40.0, 45.0, 40.0, 'normal', 70.0, 60.0, 80.0),
+    ('30100000-0000-0000-0000-000000000301'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '301', 3, 40.0, 45.0, 40.0, 'normal', 70.0, 60.0, 80.0),
+    ('30200000-0000-0000-0000-000000000302'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '302', 3, 40.0, 45.0, 40.0, 'normal', 70.0, 60.0, 80.0),
+    ('30300000-0000-0000-0000-000000000303'::UUID, '00000000-0000-0000-0000-000000000002'::UUID, '303', 3, 40.0, 45.0, 40.0, 'normal', 70.0, 60.0, 80.0)
 ON CONFLICT (id) DO UPDATE SET
     number = EXCLUDED.number,
     floor = EXCLUDED.floor;
@@ -86,6 +90,35 @@ DROP POLICY IF EXISTS "Permitir leitura de blocos" ON public.buildings;
 CREATE POLICY "Permitir leitura de condominios" ON public.condominiums FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir leitura de blocos" ON public.buildings FOR ALL USING (true) WITH CHECK (true);
 
+ALTER TABLE public.noise_readings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.noise_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir leitura de leituras" ON public.noise_readings;
+DROP POLICY IF EXISTS "Permitir criacao de leituras" ON public.noise_readings;
+DROP POLICY IF EXISTS "Permitir delecao de leituras" ON public.noise_readings;
+CREATE POLICY "Permitir leitura de leituras" ON public.noise_readings FOR SELECT USING (true);
+CREATE POLICY "Permitir criacao de leituras" ON public.noise_readings FOR INSERT WITH CHECK (true);
+CREATE POLICY "Permitir delecao de leituras" ON public.noise_readings FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Permitir leitura de eventos" ON public.noise_events;
+DROP POLICY IF EXISTS "Permitir criacao de eventos" ON public.noise_events;
+DROP POLICY IF EXISTS "Permitir atualizacao de eventos" ON public.noise_events;
+DROP POLICY IF EXISTS "Permitir delecao de eventos" ON public.noise_events;
+CREATE POLICY "Permitir leitura de eventos" ON public.noise_events FOR SELECT USING (true);
+CREATE POLICY "Permitir criacao de eventos" ON public.noise_events FOR INSERT WITH CHECK (true);
+CREATE POLICY "Permitir atualizacao de eventos" ON public.noise_events FOR UPDATE USING (true);
+CREATE POLICY "Permitir delecao de eventos" ON public.noise_events FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Permitir leitura de alertas" ON public.alerts;
+DROP POLICY IF EXISTS "Permitir criacao de alertas" ON public.alerts;
+DROP POLICY IF EXISTS "Permitir atualizacao de alertas" ON public.alerts;
+DROP POLICY IF EXISTS "Permitir delecao de alertas" ON public.alerts;
+CREATE POLICY "Permitir leitura de alertas" ON public.alerts FOR SELECT USING (true);
+CREATE POLICY "Permitir criacao de alertas" ON public.alerts FOR INSERT WITH CHECK (true);
+CREATE POLICY "Permitir atualizacao de alertas" ON public.alerts FOR UPDATE USING (true);
+CREATE POLICY "Permitir delecao de alertas" ON public.alerts FOR DELETE USING (true);
+
 -- ---------------------------------------------------------------------
 -- 5. LIMPEZA PRÉVIA DE FUNÇÕES (EVITA ERRO 42P13 DE ALTERAÇÃO DE RETURN TYPE)
 -- ---------------------------------------------------------------------
@@ -101,6 +134,8 @@ DROP FUNCTION IF EXISTS public.sync_and_get_all_profiles() CASCADE;
 DROP FUNCTION IF EXISTS public.sync_and_get_all_profiles CASCADE;
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 DROP FUNCTION IF EXISTS public.handle_new_user CASCADE;
+DROP FUNCTION IF EXISTS public.inject_noise_reading CASCADE;
+DROP FUNCTION IF EXISTS public.process_noise_reading CASCADE;
 
 -- ---------------------------------------------------------------------
 -- 5.1. RPC DE SINCRONIZAÇÃO COMPLETA COM AUTH.USERS (PUXA O BRENO E TODOS)
@@ -436,12 +471,126 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ---------------------------------------------------------------------
--- 12. PERMISSÕES DE ACESSO TOTAIS
+-- 12. RPC DE INGESTÃO UNIFICADA DE TELEMETRIA (ESP32 / SIMULADOR)
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.inject_noise_reading(
+    p_apartment_id UUID,
+    p_decibel NUMERIC,
+    p_source TEXT DEFAULT 'simulation',
+    p_is_test_data BOOLEAN DEFAULT true,
+    p_sensor_id UUID DEFAULT NULL,
+    p_device_id UUID DEFAULT NULL
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_apt RECORD;
+    v_now TIMESTAMPTZ := now();
+    v_hour INT := EXTRACT(HOUR FROM v_now);
+    v_is_night BOOLEAN := (v_hour >= 22 OR v_hour < 7);
+    v_warn_threshold NUMERIC;
+    v_crit_threshold NUMERIC;
+    v_min_duration INT := 3;
+    v_severity TEXT := 'normal';
+    v_recent_high_count INT := 0;
+    v_new_reading RECORD;
+    v_new_alert RECORD := NULL;
+    v_event_id UUID;
+BEGIN
+    -- 1. Buscar apartamento e seus limites configurados
+    SELECT * INTO v_apt FROM public.apartments WHERE id = p_apartment_id;
+    IF v_apt IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Apartamento não encontrado');
+    END IF;
+
+    v_warn_threshold := CASE 
+        WHEN v_is_night THEN COALESCE(v_apt.custom_night_threshold_db, 60.0)
+        ELSE COALESCE(v_apt.custom_day_threshold_db, 70.0)
+    END;
+
+    v_crit_threshold := CASE 
+        WHEN v_is_night THEN COALESCE(v_apt.custom_critical_threshold_db, 70.0)
+        ELSE COALESCE(v_apt.custom_critical_threshold_db, 80.0)
+    END;
+
+    -- 2. Inserir leitura na tabela noise_readings
+    INSERT INTO public.noise_readings (
+        apartment_id, decibel, source, is_test_data, sensor_id, device_id, recorded_at, created_at
+    ) VALUES (
+        p_apartment_id, p_decibel, p_source, p_is_test_data, p_sensor_id, p_device_id, v_now, v_now
+    ) RETURNING * INTO v_new_reading;
+
+    -- 3. Classificar severidade da leitura atual
+    IF p_decibel >= v_crit_threshold THEN
+        v_severity := 'critical';
+    ELSIF p_decibel >= v_warn_threshold THEN
+        v_severity := 'warning';
+    ELSE
+        v_severity := 'normal';
+    END IF;
+
+    -- 4. Atualizar telemetria em tempo real no apartamento (FONTE ÚNICA DA VERDADE)
+    UPDATE public.apartments
+    SET current_db = p_decibel,
+        peak_db = GREATEST(COALESCE(peak_db, 0), p_decibel),
+        avg_db = ROUND((((COALESCE(avg_db, 40.0) * 4) + p_decibel) / 5)::NUMERIC, 1),
+        status = v_severity
+    WHERE id = p_apartment_id;
+
+    -- 5. Avaliação de Regra de Duração / Debounce:
+    -- Conta quantas leituras consecutivas elevadas ocorreram nos últimos 15 segundos
+    SELECT COUNT(*) INTO v_recent_high_count
+    FROM public.noise_readings
+    WHERE apartment_id = p_apartment_id
+      AND recorded_at >= (v_now - INTERVAL '15 seconds')
+      AND decibel >= v_warn_threshold;
+
+    -- Se atingiu o tempo mínimo de persistência (>= 3 amostras/segundos) e atingiu nível crítico
+    IF v_recent_high_count >= v_min_duration AND p_decibel >= v_crit_threshold THEN
+        -- Criar ou atualizar noise_events
+        INSERT INTO public.noise_events (
+            apartment_id, device_id, sensor_id, peak_db, average_db, duration_seconds, started_at, ended_at, severity, source
+        ) VALUES (
+            p_apartment_id, p_device_id, p_sensor_id, p_decibel, p_decibel, v_recent_high_count, v_now - INTERVAL '3 seconds', v_now, 'critical', p_source
+        ) RETURNING id INTO v_event_id;
+
+        -- Inserir alerta crítico
+        INSERT INTO public.alerts (
+            apartment_id, event_id, type, title, message, severity, read, created_at
+        ) VALUES (
+            p_apartment_id,
+            v_event_id,
+            'high_noise',
+            'ALERTA!! RUÍDO CRÍTICO DETECTADO',
+            format('Nível sonoro atingiu %s dB no seu apartamento (limite: %s dB).', p_decibel, v_crit_threshold),
+            'critical',
+            false,
+            v_now
+        ) RETURNING * INTO v_new_alert;
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'apartment_id', p_apartment_id,
+        'decibel', p_decibel,
+        'status', v_severity,
+        'alert_created', (v_new_alert IS NOT NULL)
+    );
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ---------------------------------------------------------------------
+-- 13. PERMISSÕES DE ACESSO TOTAIS
 -- ---------------------------------------------------------------------
 GRANT ALL ON public.apartments TO anon, authenticated, service_role;
 GRANT ALL ON public.profiles TO anon, authenticated, service_role;
 GRANT ALL ON public.buildings TO anon, authenticated, service_role;
 GRANT ALL ON public.condominiums TO anon, authenticated, service_role;
+GRANT ALL ON public.noise_readings TO anon, authenticated, service_role;
+GRANT ALL ON public.noise_events TO anon, authenticated, service_role;
+GRANT ALL ON public.alerts TO anon, authenticated, service_role;
 
 GRANT EXECUTE ON FUNCTION public.assign_resident_to_apartment(UUID, UUID) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.unassign_resident_from_apartment(UUID) TO anon, authenticated, service_role;
@@ -450,3 +599,5 @@ GRANT EXECUTE ON FUNCTION public.get_or_create_profile(UUID, TEXT, TEXT) TO anon
 GRANT EXECUTE ON FUNCTION public.clear_mock_apartments() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.sync_and_get_all_profiles() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.inject_noise_reading(UUID, NUMERIC, TEXT, BOOLEAN, UUID, UUID) TO anon, authenticated, service_role;
+

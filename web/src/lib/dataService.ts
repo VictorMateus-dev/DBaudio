@@ -310,37 +310,68 @@ class LocalDataStore {
         ? (apt.custom_critical_threshold_db ?? 70.0) 
         : (apt.custom_critical_threshold_db ?? 80.0);
 
+      // Debounce: contar leituras consecutivas/recentes >= limite crítico nos últimos 15 segundos
+      const recentCriticals = this.readings.filter(r => 
+        r.apartment_id === apt.id && 
+        r.decibel >= criticalThreshold &&
+        (Date.now() - new Date(r.created_at || r.recorded_at || Date.now()).getTime()) <= 15000
+      );
+
       if (reading.decibel >= criticalThreshold) {
-        apt.status = 'critical';
-        const newAlert: Alert = {
-          id: `alt-${Date.now()}`,
-          apartment_id: apt.id,
-          type: 'high_noise',
-          title: 'ALERTA!! RUÍDO CRÍTICO DETECTADO',
-          message: `Nível sonoro atingiu ${reading.decibel.toFixed(1)} dB no apartamento ${apt.number} (limite: ${criticalThreshold} dB).`,
-          severity: 'critical',
-          read: false,
-          created_at: new Date().toISOString(),
-          apartment_number: apt.number,
-        };
-        this.alerts.unshift(newAlert);
+        // Exige pelo menos 3 amostras/segundos sustentados para confirmar alerta crítico
+        if (recentCriticals.length >= 3) {
+          apt.status = 'critical';
+          const existingRecentAlert = this.alerts.find(a => 
+            a.apartment_id === apt.id && 
+            a.severity === 'critical' && 
+            !a.read && 
+            (Date.now() - new Date(a.created_at).getTime()) <= 30000
+          );
+          if (!existingRecentAlert) {
+            const newAlert: Alert = {
+              id: `alt-${Date.now()}`,
+              apartment_id: apt.id,
+              type: 'high_noise',
+              title: 'ALERTA!! RUÍDO CRÍTICO DETECTADO',
+              message: `Nível sonoro atingiu ${reading.decibel.toFixed(1)} dB no apartamento ${apt.number} (limite: ${criticalThreshold} dB) por mais de 3 segundos.`,
+              severity: 'critical',
+              read: false,
+              created_at: new Date().toISOString(),
+              apartment_number: apt.number,
+            };
+            this.alerts.unshift(newAlert);
+          }
+        } else {
+          // Ruído pontual: decibelímetro atualiza para o valor real, mas status fica em warning sem disparar falso alerta crítico
+          apt.status = 'warning';
+        }
       } else if (reading.decibel >= warningThreshold) {
         apt.status = 'warning';
-        const newAlert: Alert = {
-          id: `alt-${Date.now()}`,
-          apartment_id: apt.id,
-          type: 'high_noise',
-          title: 'Aviso: Nível de Ruído Elevado',
-          message: `Nível sonoro atingiu ${reading.decibel.toFixed(1)} dB no apartamento ${apt.number} (limite: ${warningThreshold} dB).`,
-          severity: 'warning',
-          read: false,
-          created_at: new Date().toISOString(),
-          apartment_number: apt.number,
-        };
-        this.alerts.unshift(newAlert);
+        const existingRecentAlert = this.alerts.find(a => 
+          a.apartment_id === apt.id && 
+          a.severity === 'warning' && 
+          !a.read && 
+          (Date.now() - new Date(a.created_at).getTime()) <= 30000
+        );
+        if (!existingRecentAlert) {
+          const newAlert: Alert = {
+            id: `alt-${Date.now()}`,
+            apartment_id: apt.id,
+            type: 'high_noise',
+            title: 'Aviso: Nível de Ruído Elevado',
+            message: `Nível sonoro atingiu ${reading.decibel.toFixed(1)} dB no apartamento ${apt.number} (limite: ${warningThreshold} dB).`,
+            severity: 'warning',
+            read: false,
+            created_at: new Date().toISOString(),
+            apartment_number: apt.number,
+          };
+          this.alerts.unshift(newAlert);
+        }
       } else {
         apt.status = 'normal';
       }
+
+      this.saveApartments();
     }
 
     this.notify();
@@ -398,7 +429,16 @@ export const DataService = {
         const { data, error } = await supabase.from('apartments').select('*').order('number');
         if (!error && data && data.length > 0) {
           // Merge inteligente: Supabase + locais não duplicados
-          const supaApts = data as Apartment[];
+          const supaApts = (data as Apartment[]).map(sa => {
+            const local = localStore.apartments.find(la => la.id === sa.id || la.number === sa.number);
+            return {
+              ...sa,
+              current_db: sa.current_db != null ? Number(sa.current_db) : (local?.current_db ?? 40.0),
+              peak_db: sa.peak_db != null ? Number(sa.peak_db) : (local?.peak_db ?? 40.0),
+              avg_db: sa.avg_db != null ? Number(sa.avg_db) : (local?.avg_db ?? 40.0),
+              status: sa.status || local?.status || 'normal',
+            };
+          });
           const supaMap = new Map(supaApts.map(a => [a.id, a]));
           const localOnly = localStore.apartments.filter(
             la => !supaMap.has(la.id) && !supaApts.some(sa => sa.number === la.number)
@@ -1095,7 +1135,7 @@ export const DataService = {
     return newComment;
   },
 
-  // PIPELINE ÚNICO: INGESTÃO DE LEITURA (SIMULADOR OU MANUAL)
+  // PIPELINE ÚNICO: INGESTÃO DE LEITURA (SIMULADOR, MANUAL OU ESP32)
   async injectReading(data: {
     apartment_id: string;
     decibel: number;
@@ -1117,25 +1157,79 @@ export const DataService = {
     };
 
     if (isSupabaseConfigured && supabase) {
-      await supabase.from('noise_readings').insert({
-        apartment_id: data.apartment_id,
-        decibel: data.decibel,
-        source: data.source,
-        is_test_data: data.is_test_data ?? true,
-        sensor_id: data.sensor_id,
-        device_id: data.device_id,
-      });
+      try {
+        // 1. Tenta invocar RPC inject_noise_reading atômica
+        const { error: rpcErr } = await supabase.rpc('inject_noise_reading', {
+          p_apartment_id: data.apartment_id,
+          p_decibel: data.decibel,
+          p_source: data.source,
+          p_is_test_data: data.is_test_data ?? true,
+          p_sensor_id: data.sensor_id || null,
+          p_device_id: data.device_id || null,
+        });
+
+        if (rpcErr) {
+          console.warn('RPC inject_noise_reading indisponível, executando fallback direto no Supabase:', rpcErr.message);
+          // Inserir leitura
+          await supabase.from('noise_readings').insert({
+            apartment_id: data.apartment_id,
+            decibel: data.decibel,
+            source: data.source,
+            is_test_data: data.is_test_data ?? true,
+            sensor_id: data.sensor_id,
+            device_id: data.device_id,
+          });
+
+          // Atualizar apartments no banco
+          await supabase.from('apartments').update({
+            current_db: data.decibel,
+            updated_at: new Date().toISOString()
+          }).eq('id', data.apartment_id);
+        }
+      } catch (err) {
+        console.warn('Erro ao sincronizar leitura no Supabase:', err);
+      }
     }
 
     localStore.processNoiseReading(reading);
   },
 
+  async getLatestReadingForApartment(apartmentId: string): Promise<NoiseReading | null> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('noise_readings')
+          .select('*')
+          .eq('apartment_id', apartmentId)
+          .order('recorded_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!error && data) return data as NoiseReading;
+      } catch (e) {
+        console.warn('Erro ao buscar última leitura no Supabase:', e);
+      }
+    }
+    return localStore.readings.find(r => r.apartment_id === apartmentId) || null;
+  },
+
   // LIMPEZA SEGURA DE DADOS DE TESTE
   async cleanTestData(): Promise<{ success: boolean; deletedCount: number }> {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.rpc('cleanup_test_data');
-      if (!error && data) {
-        return { success: true, deletedCount: data.deleted_readings || 0 };
+      try {
+        const { data, error } = await supabase.rpc('cleanup_test_data');
+        if (!error && data) {
+          localStore.apartments.forEach(apt => {
+            apt.current_db = 40.0;
+            apt.status = 'normal';
+          });
+          localStore.saveApartments();
+          localStore.alerts = localStore.alerts.filter(a => !a.id.startsWith('alt-') && a.severity !== 'critical');
+          localStore.readings = localStore.readings.filter(r => !r.is_test_data);
+          localStore.notify();
+          return { success: true, deletedCount: data.deleted_readings || 0 };
+        }
+      } catch (e) {
+        console.warn('Erro na RPC cleanup_test_data:', e);
       }
     }
 
@@ -1144,12 +1238,11 @@ export const DataService = {
     localStore.alerts = localStore.alerts.filter(a => !a.id.startsWith('alt-'));
     
     localStore.apartments.forEach(apt => {
-      if (apt.number === '103') apt.status = 'warning';
-      else if (apt.number === '202') apt.status = 'critical';
-      else if (apt.number === '203' || apt.number === '303') apt.status = 'offline';
-      else apt.status = 'normal';
+      apt.current_db = 40.0;
+      apt.status = 'normal';
     });
 
+    localStore.saveApartments();
     localStore.notify();
     return { success: true, deletedCount: beforeCount - localStore.readings.length };
   }

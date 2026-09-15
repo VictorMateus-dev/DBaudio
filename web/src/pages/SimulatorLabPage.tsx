@@ -41,6 +41,13 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
 
   const simulationIntervalRef = useRef<any>(null);
 
+  // Garante que o apartamento selecionado seja preenchido assim que a lista de apartamentos carregar
+  useEffect(() => {
+    if ((!selectedAptId || !apartments.some(a => a.id === selectedAptId)) && apartments.length > 0) {
+      setSelectedAptId(initialApartmentId || apartments[0].id);
+    }
+  }, [apartments, initialApartmentId, selectedAptId]);
+
   // Quick preset buttons
   const presets = [
     { label: '40 dB (Silêncio)', value: 40, desc: 'Ambiente tranquilo / biblioteca' },
@@ -92,15 +99,17 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
   // Testes Rápidos Prontos (Cenários Práticos)
   const testCriticalAlert = async () => {
     stopContinuousSimulation();
-    setLastFeedback('Iniciando Teste de Alerta Crítico (95 dB sustentado por 5 segundos)...');
+    const targetApt = selectedApartment;
+    if (!targetApt) return;
+    setLastFeedback(`Iniciando Teste de Alerta Crítico (95 dB sustentado por 5s no Apto ${targetApt.number})...`);
     
-    // Injeta 3 leituras consecutivas para ultrapassar a duração mínima de 3s
+    // Injeta 3 leituras consecutivas para ultrapassar a duração mínima de 3s (debounce window)
     await handleInjectSingle(94.0);
-    setTimeout(() => handleInjectSingle(96.5), 1500);
+    setTimeout(() => handleInjectSingle(96.5), 1200);
     setTimeout(() => {
       handleInjectSingle(95.0);
-      setLastFeedback('Teste Crítico Finalizado: Evento agrupado e Alerta disparado no Apto ' + selectedApartment?.number);
-    }, 3200);
+      setLastFeedback(`Teste Crítico Finalizado: Evento agrupado e Alerta disparado com sucesso no Apto ${targetApt.number}!`);
+    }, 2600);
   };
 
   const testOfflineDevice = () => {
@@ -351,8 +360,9 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
 
               <button
                 onClick={() => {
+                  if (!selectedApartment) return;
                   handleInjectSingle(95.0);
-                  setLastFeedback('Ruído rápido de 95 dB injetado (1s) — Teste de Debounce: Nenhum alerta deve ser disparado!');
+                  setLastFeedback(`Ruído pontual de 95 dB injetado (1s) no Apto ${selectedApartment.number} — Teste de Debounce: Medidor atualiza para 95.0 dB, sem disparar alerta crítico!`);
                 }}
                 className="w-full text-left p-4 rounded-xl border border-amber-500/30 bg-amber-950/20 hover:bg-amber-950/30 transition"
               >
