@@ -666,7 +666,11 @@ export const DataService = {
 
   // PERFIS E GESTÃO DE MORADORES
   async saveProfile(profile: Profile): Promise<Profile> {
-    const computedStatus = profile.status || (profile.role === 'admin' ? 'approved' : (profile.apartment_id ? 'approved' : 'pending'));
+    const computedStatus = profile.role === 'admin' 
+      ? 'approved' 
+      : (profile.apartment_id 
+          ? (profile.status === 'blocked' ? 'blocked' : 'approved') 
+          : (profile.status || 'pending'));
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -776,7 +780,11 @@ export const DataService = {
           const mapped: Profile[] = rawProfiles.map((p: any) => {
             const savedAptId = allocs[p.id] || p.apartment_id;
             const apt = localStore.apartments.find(a => a.id === savedAptId || (p.apartment_number && a.number === p.apartment_number));
-            const statusVal = p.status || (p.role === 'admin' ? 'approved' : (savedAptId ? 'approved' : 'pending'));
+            const statusVal = p.role === 'admin'
+              ? 'approved'
+              : (savedAptId 
+                  ? (p.status === 'blocked' ? 'blocked' : 'approved') 
+                  : (p.status || 'pending'));
 
             return {
               ...p,
@@ -869,7 +877,18 @@ export const DataService = {
             .eq('id', profileId);
 
           if (updateError) {
-            console.warn('Update direto em profiles bloqueado por RLS/FK, persistindo localmente:', updateError);
+            console.warn('Update direto em profiles falhou, tentando update sem coluna status:', updateError);
+            try {
+              await supabase
+                .from('profiles')
+                .update({
+                  apartment_id: apartmentId,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', profileId);
+            } catch {
+              // fallback local
+            }
           }
         }
       } catch (err) {
@@ -877,7 +896,7 @@ export const DataService = {
       }
     }
 
-    // Atualiza localStore e salva persistência local
+    // Atualiza localStore e salva persistência local garantida
     let p = localStore.profiles.find(prof => prof.id === profileId);
     if (p) {
       p.apartment_id = apartmentId;
@@ -885,6 +904,7 @@ export const DataService = {
       p.status = 'approved';
       p.updated_at = new Date().toISOString();
       localStore.saveProfile(p);
+      await this.saveProfile(p);
     } else {
       const newP: Profile = {
         id: profileId,
@@ -899,6 +919,7 @@ export const DataService = {
         updated_at: new Date().toISOString(),
       };
       localStore.saveProfile(newP);
+      await this.saveProfile(newP);
     }
     saveStoredAllocation(profileId, apartmentId);
     localStore.notify();
@@ -912,16 +933,26 @@ export const DataService = {
           p_profile_id: profileId,
         });
         if (error || !data?.success) {
+          const { error: updErr } = await supabase
+            .from('profiles')
+            .update({ apartment_id: null, status: 'pending', updated_at: new Date().toISOString() })
+            .eq('id', profileId);
+          if (updErr) {
+            await supabase
+              .from('profiles')
+              .update({ apartment_id: null, updated_at: new Date().toISOString() })
+              .eq('id', profileId);
+          }
+        }
+      } catch (err) {
+        try {
           await supabase
             .from('profiles')
             .update({ apartment_id: null, status: 'pending', updated_at: new Date().toISOString() })
             .eq('id', profileId);
+        } catch {
+          // fallback
         }
-      } catch (err) {
-        await supabase
-          .from('profiles')
-          .update({ apartment_id: null, status: 'pending', updated_at: new Date().toISOString() })
-          .eq('id', profileId);
       }
     }
 
@@ -932,6 +963,7 @@ export const DataService = {
       p.apartment_number = undefined;
       p.updated_at = new Date().toISOString();
       localStore.saveProfile(p);
+      await this.saveProfile(p);
     }
     saveStoredAllocation(profileId, null);
     localStore.notify();

@@ -270,13 +270,36 @@ BEGIN
         SELECT * INTO v_apt FROM public.apartments WHERE id = p_apartment_id;
     END IF;
 
-    -- 2. Atualiza perfil: status vira 'approved', apartment_id vinculado e role 'resident'
-    UPDATE public.profiles
-    SET apartment_id = p_apartment_id,
-        status = 'approved',
-        role = 'resident',
-        updated_at = now()
-    WHERE id = p_profile_id;
+    -- 2. Atualiza ou insere perfil se ainda não existir
+    IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = p_profile_id) THEN
+        INSERT INTO public.profiles (
+            id, full_name, email, phone, role, status, condominium_id, apartment_id, created_at, updated_at
+        )
+        SELECT 
+            u.id,
+            COALESCE(u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name', split_part(u.email, '@', 1)),
+            u.email,
+            u.raw_user_meta_data->>'phone',
+            'resident',
+            'approved',
+            '00000000-0000-0000-0000-000000000001'::UUID,
+            p_apartment_id,
+            u.created_at,
+            now()
+        FROM auth.users u WHERE u.id = p_profile_id
+        ON CONFLICT (id) DO UPDATE SET
+            apartment_id = p_apartment_id,
+            status = 'approved',
+            role = 'resident',
+            updated_at = now();
+    ELSE
+        UPDATE public.profiles
+        SET apartment_id = p_apartment_id,
+            status = 'approved',
+            role = 'resident',
+            updated_at = now()
+        WHERE id = p_profile_id;
+    END IF;
 
     RETURN jsonb_build_object(
         'success', true,
@@ -358,12 +381,35 @@ BEGIN
     END IF;
 
     IF p_profile_id IS NOT NULL THEN
-        UPDATE public.profiles
-        SET apartment_id = v_new_apt.id,
-            status = 'approved',
-            role = 'resident',
-            updated_at = now()
-        WHERE id = p_profile_id;
+        IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = p_profile_id) THEN
+            INSERT INTO public.profiles (
+                id, full_name, email, phone, role, status, condominium_id, apartment_id, created_at, updated_at
+            )
+            SELECT 
+                u.id,
+                COALESCE(u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name', split_part(u.email, '@', 1)),
+                u.email,
+                u.raw_user_meta_data->>'phone',
+                'resident',
+                'approved',
+                '00000000-0000-0000-0000-000000000001'::UUID,
+                v_new_apt.id,
+                u.created_at,
+                now()
+            FROM auth.users u WHERE u.id = p_profile_id
+            ON CONFLICT (id) DO UPDATE SET
+                apartment_id = v_new_apt.id,
+                status = 'approved',
+                role = 'resident',
+                updated_at = now();
+        ELSE
+            UPDATE public.profiles
+            SET apartment_id = v_new_apt.id,
+                status = 'approved',
+                role = 'resident',
+                updated_at = now()
+            WHERE id = p_profile_id;
+        END IF;
     END IF;
 
     RETURN jsonb_build_object(

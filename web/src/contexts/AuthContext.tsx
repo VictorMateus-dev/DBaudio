@@ -92,7 +92,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             userRole = 'admin';
           }
 
-          const resolvedStatus = data.status || (effectiveAptId ? 'approved' : 'pending');
+          const resolvedStatus = effectiveAptId 
+            ? (data.status === 'blocked' ? 'blocked' : 'approved') 
+            : (data.status || 'pending');
 
           const prof: Profile = {
             ...data,
@@ -135,7 +137,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             userRole = 'admin';
           }
 
-          const resolvedStatus = rawData.status || (effectiveAptId ? 'approved' : 'pending');
+          const resolvedStatus = effectiveAptId 
+            ? (rawData.status === 'blocked' ? 'blocked' : 'approved') 
+            : (rawData.status || 'pending');
 
           const prof: Profile = {
             ...rawData,
@@ -169,7 +173,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (authUserEmail.toLowerCase().includes('admin') || authUserEmail === 'admin@dbsound.com') {
                 prof.role = 'admin';
               }
-              prof.status = prof.status || (prof.apartment_id ? 'approved' : 'pending');
+              prof.status = prof.apartment_id 
+                ? (prof.status === 'blocked' ? 'blocked' : 'approved') 
+                : (prof.status || 'pending');
               setUser(prof);
               setRole(prof.role);
               setIsDemoMode(false);
@@ -195,7 +201,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (authUserEmail?.toLowerCase().includes('admin') || authUserEmail === 'admin@dbsound.com') {
         localProf.role = 'admin';
       }
-      localProf.status = localProf.status || (localProf.apartment_id ? 'approved' : 'pending');
+      localProf.status = localProf.apartment_id 
+        ? (localProf.status === 'blocked' ? 'blocked' : 'approved') 
+        : (localProf.status || 'pending');
       setUser(localProf);
       setRole(localProf.role);
     } else {

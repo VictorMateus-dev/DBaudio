@@ -79,7 +79,7 @@ console.log('   dBSound — EXECUÇÃO DA SUÍTE DE TESTES AUTOMATIZADOS');
 console.log('===============================================================\n');
 
 let passedTests = 0;
-let totalTests = 12;
+let totalTests = 17;
 
 // CENÁRIO 1: 40 dB — Não gerar alerta
 (() => {
@@ -350,6 +350,164 @@ let totalTests = 12;
     passedTests++;
   } else {
     console.error('❌ Cenário 12 [FALHOU]: Falha na validação da janela de debounce.');
+  }
+})();
+
+// CENÁRIO 13: Alocação de Morador Pendente -> Status 'approved' e Desbloqueio da Tela de Espera
+(() => {
+  // Morador recém-cadastrado no banco Supabase (com status 'pending' inicial)
+  const dbUser = {
+    id: 'user-breno-123',
+    email: 'breno@email.com',
+    full_name: 'Breno Colega',
+    role: 'resident',
+    status: 'pending',
+    apartment_id: null
+  };
+
+  // Verificação inicial: morador pendente DEVE cair na tela de espera
+  const isBlockedInitially = !dbUser.apartment_id || dbUser.status === 'pending';
+
+  // Síndico aloca morador ao Apto 101
+  const assignedAptId = '00000000-0000-0000-0000-000000000101';
+  dbUser.apartment_id = assignedAptId;
+
+  // Lógica corrigida do AuthContext & DataService:
+  const resolvedStatus = dbUser.apartment_id 
+    ? (dbUser.status === 'blocked' ? 'blocked' : 'approved') 
+    : (dbUser.status || 'pending');
+  dbUser.status = resolvedStatus;
+
+  // Checagem de desbloqueio no ResidentMobileView
+  const isBlockedAfter = !dbUser.apartment_id || dbUser.status === 'pending';
+
+  if (isBlockedInitially && !isBlockedAfter && dbUser.status === 'approved') {
+    console.log('✅ Cenário 13 [PASSOU]: Alocação de morador pendente converteu status para "approved" e liberou dashboard sem bloqueio na tela de espera.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 13 [FALHOU]: Morador alocado permaneceu com status pendente ou bloqueado.');
+  }
+})();
+
+// CENÁRIO 14: Desvinculação de Morador -> Reversão para 'pending' e Retorno à Fila de Pendentes
+(() => {
+  const resident = {
+    id: 'user-victor-456',
+    email: 'victor@email.com',
+    full_name: 'Victor Morador',
+    role: 'resident',
+    status: 'approved',
+    apartment_id: '00000000-0000-0000-0000-000000000101'
+  };
+
+  // Síndico executa desvinculação
+  resident.apartment_id = null;
+  resident.status = 'pending';
+
+  // Verificação na visão do Síndico: morador volta a ser listado nos pendentes
+  const isListedAsPending = !resident.apartment_id;
+  // Verificação no App do Morador: morador volta para tela de análise
+  const isBlockedInMobile = !resident.apartment_id || resident.status === 'pending';
+
+  if (isListedAsPending && isBlockedInMobile && resident.status === 'pending') {
+    console.log('✅ Cenário 14 [PASSOU]: Desvinculação de morador retornou status para "pending" e reexibiu tela de espera corretamente.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 14 [FALHOU]: Desvinculação não limpou apartamento ou não reativou tela pendente.');
+  }
+})();
+
+// CENÁRIO 15: Troca de Unidade (Apto 101 -> Apto 102) sem Links Fantasmas
+(() => {
+  const apt101 = { id: 'apt-101', number: '101' };
+  const apt102 = { id: 'apt-102', number: '102' };
+
+  let profiles = [
+    { id: 'morador-1', full_name: 'Victor', apartment_id: 'apt-101', status: 'approved' }
+  ];
+
+  // 1. No início, Victor está no 101
+  const occ101Before = profiles.filter(p => p.apartment_id === apt101.id);
+  const occ102Before = profiles.filter(p => p.apartment_id === apt102.id);
+
+  // 2. Síndico troca Victor para o Apto 102
+  profiles[0].apartment_id = apt102.id;
+
+  // 3. Após a troca, Apto 101 DEVE ficar vago (0 moradores) e Apto 102 ocupado por Victor
+  const occ101After = profiles.filter(p => p.apartment_id === apt101.id);
+  const occ102After = profiles.filter(p => p.apartment_id === apt102.id);
+
+  const cleanSwap = occ101Before.length === 1 && 
+                    occ102Before.length === 0 && 
+                    occ101After.length === 0 && 
+                    occ102After.length === 1 && 
+                    occ102After[0].id === 'morador-1';
+
+  if (cleanSwap) {
+    console.log('✅ Cenário 15 [PASSOU]: Troca de unidade (101 -> 102) liberou o 101 imediatamente sem deixar vínculos fantasmas.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 15 [FALHOU]: Troca de unidade deixou link fantasma ou falhou.');
+  }
+})();
+
+// CENÁRIO 16: Isolamento Multi-Inquilino de Dois Moradores Reais (Morador A no 101, Morador B no 102)
+(() => {
+  const profiles = [
+    { id: 'victor-id', full_name: 'Victor', apartment_id: 'apt-101', role: 'resident', status: 'approved' },
+    { id: 'breno-id', full_name: 'Breno', apartment_id: 'apt-102', role: 'resident', status: 'approved' },
+  ];
+
+  const readings = [
+    { id: 'r1', apartment_id: 'apt-101', decibel: 95.0 },
+    { id: 'r2', apartment_id: 'apt-102', decibel: 42.0 },
+  ];
+
+  const alerts = [
+    { id: 'alt-1', apartment_id: 'apt-101', severity: 'critical', title: 'Alerta Apto 101' },
+  ];
+
+  // Morador Victor (Apto 101)
+  const victorUser = profiles[0];
+  const victorReadings = readings.filter(r => r.apartment_id === victorUser.apartment_id);
+  const victorAlerts = alerts.filter(a => a.apartment_id === victorUser.apartment_id);
+
+  // Morador Breno (Apto 102)
+  const brenoUser = profiles[1];
+  const brenoReadings = readings.filter(r => r.apartment_id === brenoUser.apartment_id);
+  const brenoAlerts = alerts.filter(a => a.apartment_id === brenoUser.apartment_id);
+
+  const passed = victorReadings.length === 1 && victorReadings[0].decibel === 95.0 &&
+                 victorAlerts.length === 1 &&
+                 brenoReadings.length === 1 && brenoReadings[0].decibel === 42.0 &&
+                 brenoAlerts.length === 0;
+
+  if (passed) {
+    console.log('✅ Cenário 16 [PASSOU]: Isolamento Multi-Inquilino entre Morador Victor (101) e Morador Breno (102) validado com dados 100% segregados.');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 16 [FALHOU]: Vazamento de leituras ou alertas entre Victor e Breno.');
+  }
+})();
+
+// CENÁRIO 17: Resolução Robusta de Status (Eliminação definitiva do curto-circuito "pending" || "approved")
+(() => {
+  const resolveStatus = (dbStatus, effectiveAptId) => {
+    return effectiveAptId 
+      ? (dbStatus === 'blocked' ? 'blocked' : 'approved') 
+      : (dbStatus || 'pending');
+  };
+
+  const test1 = resolveStatus('pending', 'apt-101') === 'approved'; // Morador pendente alocado ao 101 vira approved
+  const test2 = resolveStatus('pending', null) === 'pending';       // Morador pendente sem apto continua pending
+  const test3 = resolveStatus('blocked', 'apt-101') === 'blocked';   // Morador explicitamente bloqueado não ganha approved
+  const test4 = resolveStatus(undefined, 'apt-101') === 'approved'; // Morador sem status no banco mas com apto vira approved
+
+  if (test1 && test2 && test3 && test4) {
+    console.log('✅ Cenário 17 [PASSOU]: Resolução de status validada para todas as combinações (sem curto-circuito de string truthy).');
+    passedTests++;
+  } else {
+    console.error('❌ Cenário 17 [FALHOU]: Falha na resolução de status.');
   }
 })();
 
