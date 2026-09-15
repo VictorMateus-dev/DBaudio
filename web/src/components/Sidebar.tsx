@@ -47,7 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="w-64 bg-space-900/95 backdrop-blur-xl border-r border-white/5 flex flex-col justify-between h-screen sticky top-0 z-30">
+    <aside className="w-64 h-full shrink-0 bg-space-900/95 backdrop-blur-xl border-r border-white/5 flex flex-col justify-between z-10 select-none">
       <div>
         {/* Vaultflow Logo & Brand */}
         <div className="p-6 border-b border-white/5 flex items-center space-x-3">

@@ -138,8 +138,8 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
   };
 
   return (
-    <div className="flex h-screen bg-space-950 text-slate-100 overflow-hidden">
-      {/* Sidebar fixo lateral esquerdo */}
+    <div className="grid h-screen w-screen bg-space-950 text-slate-100 overflow-hidden grid-cols-[16rem_minmax(0,1fr)]">
+      {/* Sidebar na coluna 1 (16rem fixa, sem sobreposição) */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={handleSelectTab}
@@ -149,8 +149,8 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
         unreadMessagesCount={unreadMessagesCount}
       />
 
-      {/* Área principal do Síndico */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      {/* Área principal do Síndico na coluna 2 (ocupa estritamente o espaço restante) */}
+      <div className="flex flex-col h-full min-w-0 overflow-y-auto">
         <Header
           alerts={alerts}
           onSelectApartment={(aptId) => {
@@ -158,7 +158,7 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
           }}
         />
 
-        <main className="flex-1 pb-16">
+        <main className="flex-1 min-w-0 pb-16">
           <Outlet />
         </main>
       </div>

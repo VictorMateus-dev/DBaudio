@@ -366,7 +366,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
   };
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto animate-fadeIn">
+    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 animate-fadeIn">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1316,22 +1316,22 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                 </div>
               ) : (
                 chatMessages.map(msg => {
-                  const isSyndic = msg.sender_role === 'syndic';
+                  const isMe = user?.id ? msg.sender_id === user.id : msg.sender_role === 'syndic';
                   return (
                     <div
                       key={msg.id}
-                      className={`flex flex-col ${isSyndic ? 'items-end' : 'items-start'}`}
+                      className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                     >
                       <div className="flex items-center gap-2 mb-1 text-[10px] text-slate-400">
-                        <span className="font-bold text-violet-300">
-                          {isSyndic ? 'Você (Síndico Geral)' : (msg.sender_name || 'Morador')}
+                        <span className={`font-bold ${isMe ? 'text-violet-300' : 'text-blue-400'}`}>
+                          {isMe ? 'Você (Síndico Geral)' : (msg.sender_name || 'Morador')}
                         </span>
                         <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
 
                       <div
                         className={`p-3 rounded-2xl text-xs max-w-[85%] leading-relaxed ${
-                          isSyndic
+                          isMe
                             ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-tr-none shadow-md'
                             : 'bg-space-900 border border-white/10 text-slate-200 rounded-tl-none'
                         }`}
@@ -1340,8 +1340,8 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                       </div>
 
                       <div className="text-[9px] text-slate-500 mt-0.5 flex items-center gap-1">
-                        {isSyndic && (
-                          <span>{msg.read ? '✓✓ Lida pelo morador' : '✓ Enviada'}</span>
+                        {isMe && (
+                          <span>{msg.read ? '✓✓ Visualizada' : '✓ Enviada'}</span>
                         )}
                       </div>
                     </div>

@@ -25,6 +25,8 @@ const initialApartments: Apartment[] = [
   { id: '30100000-0000-0000-0000-000000000301', building_id: DEFAULT_BUILDING_ID, number: '301', floor: 3, current_db: 43.0, status: 'normal', peak_db: 52.0, avg_db: 44.5, created_at: new Date().toISOString() },
   { id: '30200000-0000-0000-0000-000000000302', building_id: DEFAULT_BUILDING_ID, number: '302', floor: 3, current_db: 48.6, status: 'normal', peak_db: 56.1, avg_db: 47.2, created_at: new Date().toISOString() },
   { id: '30300000-0000-0000-0000-000000000303', building_id: DEFAULT_BUILDING_ID, number: '303', floor: 3, current_db: 0, status: 'offline', peak_db: 51.0, avg_db: 46.0, created_at: new Date().toISOString() },
+  { id: '30500000-0000-0000-0000-000000000305', building_id: DEFAULT_BUILDING_ID, number: '305', floor: 3, current_db: 78.2, status: 'warning', peak_db: 81.0, avg_db: 72.0, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80, created_at: new Date().toISOString() },
+  { id: '40200000-0000-0000-0000-000000000402', building_id: DEFAULT_BUILDING_ID, number: '402', floor: 4, current_db: 46.5, status: 'normal', peak_db: 55.0, avg_db: 47.0, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80, created_at: new Date().toISOString() },
 ];
 
 const initialDevices: Device[] = [
@@ -152,73 +154,150 @@ const initialComments: Record<string, OccurrenceComment[]> = {
 
 const initialConversations: Conversation[] = [
   {
-    id: 'conv-occ-1',
+    id: '10100000-cccc-0000-0000-000000000101',
     condominium_id: DEFAULT_CONDO_ID,
-    apartment_id: initialApartments[4].id, // Apto 202
-    apartment_number: '202',
-    occurrence_id: 'occ1',
+    apartment_id: '10100000-0000-0000-0000-000000000101',
+    apartment_number: '101',
+    occurrence_id: null,
     created_by: 'aaaa1111-0000-0000-0000-000000000001',
-    title: 'Ocorrência #001 — Música Alta e Batidas',
-    type: 'ocorrencia',
+    title: 'Contato Preventivo • Apto 101',
+    subject: 'Aviso Preventivo de Volume Sonoro (72 dB)',
+    type: 'preventivo',
     status: 'aberta',
-    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 1.5).toISOString(),
-    last_message: 'Olá Síndico, já reduzimos o volume. Desculpe pelo transtorno.',
+    created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 3.5).toISOString(),
+    last_message: 'Boa noite Síndico, já reduzimos o volume do som.',
     unread_count: 0,
   },
   {
-    id: 'conv-prev-103',
+    id: '20300000-cccc-0000-0000-000000000203',
     condominium_id: DEFAULT_CONDO_ID,
-    apartment_id: initialApartments[2].id, // Apto 103
-    apartment_number: '103',
+    apartment_id: '20300000-0000-0000-0000-000000000203',
+    apartment_number: '203',
+    occurrence_id: 'occ1',
+    created_by: 'aaaa1111-0000-0000-0000-000000000001',
+    title: 'Ocorrência #001 • Apto 203',
+    subject: 'Ocorrência #001 • Som Mecânico Noturno',
+    type: 'ocorrencia',
+    status: 'aberta',
+    created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 2.5).toISOString(),
+    last_message: 'Olá Síndico, desculpe pelo barulho da TV, já desligamos.',
+    unread_count: 0,
+  },
+  {
+    id: '30500000-cccc-0000-0000-000000000305',
+    condominium_id: DEFAULT_CONDO_ID,
+    apartment_id: '30500000-0000-0000-0000-000000000305',
+    apartment_number: '305',
     occurrence_id: null,
     created_by: 'aaaa1111-0000-0000-0000-000000000001',
-    title: 'Contato Preventivo — Ruído Elevado (74.5 dB)',
+    title: 'Contato Preventivo • Apto 305',
+    subject: 'Aviso Preventivo • Volume Elevado de Confraternização',
     type: 'preventivo',
     status: 'aberta',
+    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 1.5).toISOString(),
+    last_message: 'Identificamos picos de 78 dB. Favor adequar ao regimento.',
+    unread_count: 1,
+  },
+  {
+    id: '40200000-cccc-0000-0000-000000000402',
+    condominium_id: DEFAULT_CONDO_ID,
+    apartment_id: '40200000-0000-0000-0000-000000000402',
+    apartment_number: '402',
+    occurrence_id: 'occ2',
+    created_by: 'aaaa1111-0000-0000-0000-000000000001',
+    title: 'Ocorrência #002 • Apto 402',
+    subject: 'Ocorrência #002 • Ruído de Impacto e Salto',
+    type: 'ocorrencia',
+    status: 'aberta',
     created_at: new Date(Date.now() - 3600000 * 1).toISOString(),
-    updated_at: new Date(Date.now() - 3600000 * 1).toISOString(),
-    last_message: 'Olá, identificamos ruído sonoro de 74.5 dB pelo sensor acústico. Poderia verificar preventivamente?',
+    updated_at: new Date(Date.now() - 3600000 * 0.5).toISOString(),
+    last_message: 'Recebemos queixas de ruído de salto repetido.',
     unread_count: 1,
   }
 ];
 
 const initialMessages: Record<string, ConversationMessage[]> = {
-  'conv-occ-1': [
+  '10100000-cccc-0000-0000-000000000101': [
     {
-      id: 'm1',
-      conversation_id: 'conv-occ-1',
+      id: 'm-101-1',
+      conversation_id: '10100000-cccc-0000-0000-000000000101',
       sender_id: 'aaaa1111-0000-0000-0000-000000000001',
+      recipient_id: 'bbbb2222-0000-0000-0000-000000000101',
       sender_name: 'Carlos Síndico Geral',
       sender_role: 'syndic',
-      message: 'Olá! Recebemos relatos de som mecânico com graves elevados nesta unidade após às 22h. Poderia verificar e adequar o volume?',
-      content: 'Olá! Recebemos relatos de som mecânico com graves elevados nesta unidade após às 22h. Poderia verificar e adequar o volume?',
+      message: 'Olá morador do Apto 101, identificamos leitura acústica de 72 dB. Poderia verificar preventivamente o volume?',
+      content: 'Olá morador do Apto 101, identificamos leitura acústica de 72 dB. Poderia verificar preventivamente o volume?',
       read: true,
-      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+      created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
     },
     {
-      id: 'm2',
-      conversation_id: 'conv-occ-1',
-      sender_id: 'cccc3333-0000-0000-0000-000000000202',
-      sender_name: 'Mariana Oliveira (Apto 202)',
+      id: 'm-101-2',
+      conversation_id: '10100000-cccc-0000-0000-000000000101',
+      sender_id: 'bbbb2222-0000-0000-0000-000000000101',
+      recipient_id: 'aaaa1111-0000-0000-0000-000000000001',
+      sender_name: 'João Silva (Apto 101)',
       sender_role: 'resident',
-      message: 'Olá Síndico, já reduzimos o volume. Desculpe pelo transtorno.',
-      content: 'Olá Síndico, já reduzimos o volume. Desculpe pelo transtorno.',
+      message: 'Boa noite Síndico, já reduzimos o volume do som.',
+      content: 'Boa noite Síndico, já reduzimos o volume do som.',
       read: true,
+      created_at: new Date(Date.now() - 3600000 * 3.5).toISOString(),
+    }
+  ],
+  '20300000-cccc-0000-0000-000000000203': [
+    {
+      id: 'm-203-1',
+      conversation_id: '20300000-cccc-0000-0000-000000000203',
+      sender_id: 'aaaa1111-0000-0000-0000-000000000001',
+      recipient_id: 'cccc3333-0000-0000-0000-000000000203',
+      sender_name: 'Carlos Síndico Geral',
+      sender_role: 'syndic',
+      message: 'Olá morador do Apto 203! Registramos queixa de som mecânico após às 22h. Solicitamos adequação imediata.',
+      content: 'Olá morador do Apto 203! Registramos queixa de som mecânico após às 22h. Solicitamos adequação imediata.',
+      read: true,
+      created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
+    },
+    {
+      id: 'm-203-2',
+      conversation_id: '20300000-cccc-0000-0000-000000000203',
+      sender_id: 'cccc3333-0000-0000-0000-000000000203',
+      recipient_id: 'aaaa1111-0000-0000-0000-000000000001',
+      sender_name: 'Morador Apto 203',
+      sender_role: 'resident',
+      message: 'Olá Síndico, desculpe pelo barulho da TV, já desligamos.',
+      content: 'Olá Síndico, desculpe pelo barulho da TV, já desligamos.',
+      read: true,
+      created_at: new Date(Date.now() - 3600000 * 2.5).toISOString(),
+    }
+  ],
+  '30500000-cccc-0000-0000-000000000305': [
+    {
+      id: 'm-305-1',
+      conversation_id: '30500000-cccc-0000-0000-000000000305',
+      sender_id: 'aaaa1111-0000-0000-0000-000000000001',
+      recipient_id: 'eeee5555-0000-0000-0000-000000000305',
+      sender_name: 'Carlos Síndico Geral',
+      sender_role: 'syndic',
+      message: 'Identificamos picos de 78 dB. Favor adequar ao regimento interno do condomínio para evitar penalidades.',
+      content: 'Identificamos picos de 78 dB. Favor adequar ao regimento interno do condomínio para evitar penalidades.',
+      read: false,
       created_at: new Date(Date.now() - 3600000 * 1.5).toISOString(),
     }
   ],
-  'conv-prev-103': [
+  '40200000-cccc-0000-0000-000000000402': [
     {
-      id: 'm3',
-      conversation_id: 'conv-prev-103',
+      id: 'm-402-1',
+      conversation_id: '40200000-cccc-0000-0000-000000000402',
       sender_id: 'aaaa1111-0000-0000-0000-000000000001',
+      recipient_id: 'ffff6666-0000-0000-0000-000000000402',
       sender_name: 'Carlos Síndico Geral',
       sender_role: 'syndic',
-      message: 'Olá! Identificamos ruído sonoro de 74.5 dB pelo sensor acústico em seu apartamento. Poderia verificar preventivamente para mantermos o sossego coletivo?',
-      content: 'Olá! Identificamos ruído sonoro de 74.5 dB pelo sensor acústico em seu apartamento. Poderia verificar preventivamente para mantermos o sossego coletivo?',
+      message: 'Recebemos queixas de ruído de salto repetido no Apto 402. Solicitamos atenção ao piso e acústica.',
+      content: 'Recebemos queixas de ruído de salto repetido no Apto 402. Solicitamos atenção ao piso e acústica.',
       read: false,
-      created_at: new Date(Date.now() - 3600000 * 1).toISOString(),
+      created_at: new Date(Date.now() - 3600000 * 0.5).toISOString(),
     }
   ]
 };
@@ -1969,22 +2048,29 @@ export const DataService = {
     }
 
     const msgs = localStore.messages[conversationId];
+    let hasChanged = false;
     if (msgs) {
       msgs.forEach(m => {
-        if (!currentUserId || m.sender_id !== currentUserId) {
+        if ((!currentUserId || m.sender_id !== currentUserId) && !m.read) {
           m.read = true;
+          hasChanged = true;
         }
       });
-      localStore.saveMessages();
+      if (hasChanged) {
+        localStore.saveMessages();
+      }
     }
 
     const conv = localStore.conversations.find(c => c.id === conversationId);
-    if (conv) {
+    if (conv && conv.unread_count && conv.unread_count > 0) {
       conv.unread_count = 0;
       localStore.saveConversations();
+      hasChanged = true;
     }
 
-    localStore.notify();
+    if (hasChanged) {
+      localStore.notify();
+    }
   },
 
   async getUnreadMessagesCount(apartmentId?: string, isSyndic?: boolean): Promise<number> {

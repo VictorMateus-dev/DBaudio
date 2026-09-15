@@ -27,7 +27,10 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
   const { user } = useAuth();
   const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const selectedConversationIdRef = React.useRef<string | null>(null);
+  const isInitialMountRef = React.useRef<boolean>(true);
+
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [newMessageText, setNewMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -35,7 +38,7 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
   const [filterType, setFilterType] = useState<'all' | 'preventivo' | 'ocorrencia' | 'unread'>('all');
   const [apartments, setApartments] = useState<Apartment[]>([]);
 
-  const loadConversations = async () => {
+  const loadConversations = React.useCallback(async () => {
     const [convs, apts] = await Promise.all([
       DataService.getConversations(),
       DataService.getApartments()
@@ -43,18 +46,29 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
     setConversations(convs);
     setApartments(apts);
 
-    if (selectedConversation) {
-      const updated = convs.find(c => c.id === selectedConversation.id);
-      if (updated) {
-        setSelectedConversation(updated);
-        const msgs = await DataService.getMessages(updated.id);
+    const currentId = selectedConversationIdRef.current;
+    if (currentId) {
+      const existing = convs.find(c => c.id === currentId);
+      if (existing) {
+        const msgs = await DataService.getMessages(currentId);
         setMessages(msgs);
+        return;
       }
-    } else if (convs.length > 0) {
-      // Auto-seleciona a primeira se nenhuma selecionada
-      handleSelectConversation(convs[0]);
     }
-  };
+
+    // Auto-seleciona a primeira conversa SOMENTE na montagem inicial se nada estiver selecionado
+    if (isInitialMountRef.current && convs.length > 0) {
+      isInitialMountRef.current = false;
+      const firstId = convs[0].id;
+      selectedConversationIdRef.current = firstId;
+      setSelectedConversationId(firstId);
+      console.log('SELECTED CONVERSATION (INITIAL):', firstId);
+      console.log('FETCHING MESSAGES FOR:', firstId);
+      const msgs = await DataService.getMessages(firstId);
+      setMessages(msgs);
+      await DataService.markMessagesAsRead(firstId, user?.id);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     loadConversations();
@@ -62,25 +76,35 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
       loadConversations();
     });
     return () => unsub();
-  }, []);
+  }, [loadConversations]);
 
-  const handleSelectConversation = async (conv: Conversation) => {
-    setSelectedConversation(conv);
-    const msgs = await DataService.getMessages(conv.id);
+  const handleSelectConversation = async (convId: string) => {
+    console.log('CLICKED CONVERSATION:', convId);
+    selectedConversationIdRef.current = convId;
+    setSelectedConversationId(convId);
+    console.log('SELECTED CONVERSATION:', convId);
+    console.log('FETCHING MESSAGES FOR:', convId);
+
+    const msgs = await DataService.getMessages(convId);
     setMessages(msgs);
-    await DataService.markMessagesAsRead(conv.id, user?.id);
+    console.log('RENDERING CONVERSATION:', convId);
+
+    await DataService.markMessagesAsRead(convId, user?.id);
     if (onRefresh) onRefresh();
   };
 
+  const activeConversation = conversations.find(c => c.id === selectedConversationId) || null;
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessageText.trim() || !selectedConversation || isSending) return;
+    if (!newMessageText.trim() || !activeConversation || isSending) return;
 
     setIsSending(true);
     try {
       const msg = await DataService.sendMessage({
-        conversation_id: selectedConversation.id,
-        sender_id: user?.id || 'admin-sindico',
+        conversation_id: activeConversation.id,
+        sender_id: user?.id || 'aaaa1111-0000-0000-0000-000000000001',
+        recipient_id: activeConversation.created_by || activeConversation.apartment_id,
         sender_name: user?.full_name || 'Síndico Geral',
         sender_role: 'syndic',
         content: newMessageText.trim(),
@@ -193,12 +217,12 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
               </div>
             ) : (
               filteredConversations.map(conv => {
-                const isSelected = selectedConversation?.id === conv.id;
+                const isSelected = conv.id === selectedConversationId;
                 const hasUnread = (conv.unread_count || 0) > 0;
                 return (
                   <div
                     key={conv.id}
-                    onClick={() => handleSelectConversation(conv)}
+                    onClick={() => handleSelectConversation(conv.id)}
                     className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative overflow-hidden ${
                       isSelected
                         ? 'bg-space-900 border-violet-500 shadow-glow-purple'
@@ -248,34 +272,34 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
 
         {/* Right Col: Active Chat Window */}
         <div className="lg:col-span-2">
-          {selectedConversation ? (
+          {activeConversation ? (
             <div className="vault-card rounded-3xl p-6 space-y-4 flex flex-col h-[740px] animate-fadeIn border border-white/10">
               {/* Top Bar of Active Conversation */}
               <div className="flex items-center justify-between pb-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-glow-purple">
-                    {selectedConversation.apartment_number ? `A${selectedConversation.apartment_number}` : 'DB'}
+                    {activeConversation.apartment_number ? `A${activeConversation.apartment_number}` : 'DB'}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-base text-white">
-                        Apartamento {selectedConversation.apartment_number}
+                        Apartamento {activeConversation.apartment_number}
                       </h3>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                        selectedConversation.type === 'preventivo'
+                        activeConversation.type === 'preventivo'
                           ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                           : 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
                       }`}>
-                        {selectedConversation.type === 'preventivo' ? '🔴 Contato Preventivo' : '🟢 Ocorrência Vinculada'}
+                        {activeConversation.type === 'preventivo' ? '🔴 Contato Preventivo' : '🟢 Ocorrência Vinculada'}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400">
-                      {selectedConversation.subject}
+                      {activeConversation.subject}
                     </p>
                   </div>
                 </div>
 
-                {selectedConversation.occurrence_id && (
+                {activeConversation.occurrence_id && (
                   <button
                     type="button"
                     onClick={() => navigate('/sindico/ocorrencias')}
@@ -289,13 +313,13 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
 
               {/* Informative Banner */}
               <div className={`p-3 rounded-2xl text-[11px] leading-relaxed flex items-center gap-2.5 ${
-                selectedConversation.type === 'preventivo'
+                activeConversation.type === 'preventivo'
                   ? 'bg-amber-950/30 border border-amber-500/30 text-amber-300'
                   : 'bg-violet-950/30 border border-violet-500/30 text-violet-300'
               }`}>
                 <ShieldCheck className="w-4 h-4 shrink-0" />
                 <span>
-                  {selectedConversation.type === 'preventivo'
+                  {activeConversation.type === 'preventivo'
                     ? '🛡️ Este contato preventivo foi disparado pelo monitoramento contínuo de ruído. Nenhuma ocorrência ou penalidade formal foi registrada contra a unidade.'
                     : '⚖️ Este chat está vinculado formalmente a uma ocorrência registrada. O sigilo do denunciante original permanece 100% blindado.'}
                 </span>
@@ -328,22 +352,22 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
                   </div>
                 ) : (
                   messages.map(msg => {
-                    const isSyndic = msg.sender_role === 'syndic';
+                    const isMe = user?.id ? msg.sender_id === user.id : msg.sender_role === 'syndic';
                     return (
                       <div
                         key={msg.id}
-                        className={`flex flex-col ${isSyndic ? 'items-end' : 'items-start'}`}
+                        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                       >
                         <div className="flex items-center gap-2 mb-1 text-[10px] text-slate-400">
-                          <span className={`font-bold ${isSyndic ? 'text-violet-300' : 'text-blue-400'}`}>
-                            {isSyndic ? 'Você (Síndico Geral)' : (msg.sender_name || `Morador Apto ${selectedConversation.apartment_number}`)}
+                          <span className={`font-bold ${isMe ? 'text-violet-300' : 'text-blue-400'}`}>
+                            {isMe ? 'Você (Síndico Geral)' : (msg.sender_name || `Morador Apto ${activeConversation.apartment_number}`)}
                           </span>
                           <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
 
                         <div
                           className={`p-3 rounded-2xl text-xs max-w-[85%] leading-relaxed ${
-                            isSyndic
+                            isMe
                               ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-tr-none shadow-md'
                               : 'bg-space-900 border border-white/10 text-slate-200 rounded-tl-none'
                           }`}
@@ -352,8 +376,8 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
                         </div>
 
                         <div className="text-[9px] text-slate-500 mt-0.5 flex items-center gap-1">
-                          {isSyndic && (
-                            <span>{msg.read ? '✓✓ Lida pelo morador' : '✓ Enviada'}</span>
+                          {isMe && (
+                            <span>{msg.read ? '✓✓ Visualizada' : '✓ Enviada'}</span>
                           )}
                         </div>
                       </div>

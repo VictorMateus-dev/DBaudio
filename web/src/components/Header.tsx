@@ -23,18 +23,18 @@ export const Header: React.FC<HeaderProps> = ({ alerts, onSelectApartment }) => 
   const unreadAlerts = alerts.filter(a => !a.read);
 
   return (
-    <header className="h-16 bg-space-950/80 backdrop-blur-xl border-b border-white/5 px-8 flex items-center justify-between sticky top-0 z-20">
+    <header className="h-16 w-full shrink-0 bg-space-950/80 backdrop-blur-xl border-b border-white/5 px-6 md:px-8 flex items-center justify-between sticky top-0 z-20">
       {/* Condominium details & Active Policy */}
-      <div className="flex items-center space-x-6">
-        <div>
-          <h2 className="text-xs font-bold text-white flex items-center gap-1.5">
-            <Building className="w-3.5 h-3.5 text-violet-400" />
+      <div className="flex items-center space-x-6 min-w-0">
+        <div className="shrink-0">
+          <h2 className="text-xs font-bold text-white flex items-center gap-1.5 whitespace-nowrap">
+            <Building className="w-3.5 h-3.5 text-violet-400 shrink-0" />
             <span>Residencial dBSound • Bloco Central</span>
           </h2>
-          <p className="text-[11px] text-slate-400">Gestão Acústica e Monitoramento em Tempo Real</p>
+          <p className="text-[11px] text-slate-400 whitespace-nowrap">Gestão Acústica e Monitoramento em Tempo Real</p>
         </div>
 
-        <div className="h-5 w-px bg-white/10 hidden md:block"></div>
+        <div className="h-5 w-px bg-white/10 hidden lg:block shrink-0"></div>
 
         {/* Current Active Noise Policy Pill */}
         <div className="hidden md:flex items-center space-x-2 bg-space-900/90 px-3 py-1.5 rounded-full border border-white/10 text-xs">

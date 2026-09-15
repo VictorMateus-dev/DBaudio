@@ -160,9 +160,11 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
       const msg = await DataService.sendMessage({
         conversation_id: selectedConversation.id,
         sender_id: user?.id || 'morador-' + effectiveApt.number,
+        recipient_id: selectedConversation.created_by || 'admin-sindico',
         sender_name: user?.full_name || `Morador Apto ${effectiveApt.number}`,
         sender_role: 'resident',
         content: residentReplyText.trim(),
+        message: residentReplyText.trim(),
       });
       setActiveMessages(prev => [...prev, msg]);
       setResidentReplyText('');
@@ -563,12 +565,12 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                       <p className="text-center py-6 text-slate-500 text-[11px]">Nenhuma mensagem nesta conversa.</p>
                     ) : (
                       activeMessages.map(msg => {
-                        const isMe = msg.sender_role === 'resident';
+                        const isMe = user?.id ? msg.sender_id === user.id : msg.sender_role === 'resident';
                         return (
                           <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                             <div className="flex items-center gap-1.5 mb-0.5 text-[9px] text-slate-400">
                               <span className={isMe ? 'text-blue-400 font-semibold' : 'text-violet-400 font-bold'}>
-                                {isMe ? 'Você' : 'Síndico Geral'}
+                                {isMe ? 'Você' : (msg.sender_name || 'Síndico Geral')}
                               </span>
                               <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
@@ -579,6 +581,11 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                             }`}>
                               <p className="whitespace-pre-wrap">{msg.content || msg.message}</p>
                             </div>
+                            {isMe && (
+                              <div className="text-[9px] text-slate-500 mt-0.5 flex items-center gap-1">
+                                <span>{msg.read ? '✓✓ Visualizada' : '✓ Enviada'}</span>
+                              </div>
+                            )}
                           </div>
                         );
                       })
