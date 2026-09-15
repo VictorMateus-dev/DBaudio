@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StatCard } from '../components/StatCard';
 import { FloorPlanGrid } from '../components/FloorPlanGrid';
 import { NoiseChart } from '../components/NoiseChart';
@@ -12,9 +12,16 @@ import {
   Flame, 
   CheckCircle2, 
   ArrowRight,
-  TrendingUp
+  TrendingUp,
+  MessageSquare,
+  X,
+  ShieldCheck,
+  Send,
+  Info
 } from 'lucide-react';
 import { NavTab } from '../components/Sidebar';
+import { DataService } from '../lib/dataService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface DashboardOverviewProps {
   apartments: Apartment[];
@@ -33,6 +40,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onNavigateTab,
   onSelectApartment,
 }) => {
+  const { user } = useAuth();
   const onlineDevicesCount = devices.filter(d => d.status === 'online').length;
   const offlineDevicesCount = devices.filter(d => d.status === 'offline').length;
   const openOccurrencesCount = occurrences.filter(o => o.status === 'aberta' || o.status === 'em análise').length;
@@ -40,6 +48,43 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   
   // Calcular maior pico registrado
   const highestPeak = Math.max(...apartments.map(a => a.peak_db || 0), 0);
+
+  // Modal de Contato Preventivo
+  const [preventiveModalApartment, setPreventiveModalApartment] = useState<Apartment | null>(null);
+  const [preventiveSubject, setPreventiveSubject] = useState('');
+  const [preventiveMessage, setPreventiveMessage] = useState('');
+  const [isSendingPreventive, setIsSendingPreventive] = useState(false);
+  const [preventiveSuccessMsg, setPreventiveSuccessMsg] = useState<string | null>(null);
+
+  const handleOpenPreventiveModal = (apt: Apartment) => {
+    setPreventiveModalApartment(apt);
+    setPreventiveSubject(`Aviso Preventivo de Ruído • Apto ${apt.number}`);
+    setPreventiveMessage(
+      `Olá morador do Apto ${apt.number}! Nossos sensores acústicos registraram leituras contínuas de ${apt.current_db?.toFixed(1) || '70.0'} dB na sua unidade. Solicitamos gentilmente a verificação do volume de aparelhos de som, TV ou ruídos de impacto para preservação da boa convivência.`
+    );
+  };
+
+  const handleSendPreventive = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!preventiveModalApartment || !preventiveMessage.trim() || isSendingPreventive) return;
+
+    setIsSendingPreventive(true);
+    try {
+      await DataService.createConversation({
+        condominium_id: user?.condominium_id || '00000000-0000-0000-0000-000000000001',
+        apartment_id: preventiveModalApartment.id,
+        type: 'preventivo',
+        subject: preventiveSubject.trim() || `Contato Preventivo • Apto ${preventiveModalApartment.number}`,
+        initial_message: preventiveMessage.trim(),
+      });
+
+      setPreventiveSuccessMsg(`Conversa preventiva iniciada com sucesso com o Apto ${preventiveModalApartment.number}! Notificação enviada para a Central de Mensagens do morador.`);
+      setTimeout(() => setPreventiveSuccessMsg(null), 5000);
+      setPreventiveModalApartment(null);
+    } finally {
+      setIsSendingPreventive(false);
+    }
+  };
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
@@ -62,6 +107,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Notificação de Sucesso de Contato Preventivo */}
+      {preventiveSuccessMsg && (
+        <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{preventiveSuccessMsg}</span>
+        </div>
+      )}
 
       {/* Metric Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -129,6 +182,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <FloorPlanGrid
             apartments={apartments}
             onSelectApartment={onSelectApartment}
+            onPreventiveContact={handleOpenPreventiveModal}
           />
 
           <NoiseChart
@@ -160,19 +214,36 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               {alerts.length === 0 ? (
                 <p className="text-xs text-slate-400 text-center py-6">Nenhum ruído anômalo nas últimas horas.</p>
               ) : (
-                alerts.map(alt => (
-                  <div key={alt.id} className="p-3 bg-slate-800/60 border border-slate-700/50 rounded-lg text-xs">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold text-white flex items-center gap-1">
-                        {alt.severity === 'critical' ? '🔴' : '🟡'} Apto {alt.apartment_number || '101'}
-                      </span>
-                      <span className="text-[10px] text-slate-400">
-                        {new Date(alt.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                alerts.map(alt => {
+                  const targetApt = apartments.find(a => a.id === alt.apartment_id || a.number === alt.apartment_number);
+                  return (
+                    <div key={alt.id} className="p-3 bg-slate-800/60 border border-slate-700/50 rounded-lg text-xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white flex items-center gap-1">
+                          {alt.severity === 'critical' ? '🔴' : '🟡'} Apto {alt.apartment_number || '101'}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(alt.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-slate-300">{alt.message}</p>
+
+                      {targetApt && (
+                        <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                          <span className="text-[10px] text-slate-400">Telemetria elevada</span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPreventiveModal(targetApt)}
+                            className="text-[10px] font-bold text-violet-400 hover:text-violet-300 flex items-center gap-1 bg-violet-600/10 hover:bg-violet-600/25 px-2 py-0.5 rounded border border-violet-500/20 transition"
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                            <span>Contatar</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-slate-300">{alt.message}</p>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -216,6 +287,117 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* MODAL: CONTATO PREVENTIVO DO SÍNDICO (NÃO GERA DENÚNCIA) */}
+      {/* ========================================================================= */}
+      {preventiveModalApartment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="vault-card rounded-3xl p-6 w-full max-w-lg space-y-4 border border-violet-500/30 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-violet-600/20 border border-violet-500/30 text-violet-400 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Contato Preventivo • Apto {preventiveModalApartment.number}</h3>
+                  <p className="text-[11px] text-slate-400">Comunicação direta baseada na telemetria acústica</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreventiveModalApartment(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Disclaimer Explícito: NÃO CRIA OCORRÊNCIA */}
+            <div className="p-3 rounded-xl bg-violet-950/30 border border-violet-500/20 text-[11px] text-violet-300 space-y-1">
+              <span className="font-bold flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
+                Diálogo Educativo & Amigável:
+              </span>
+              <p>
+                Esta mensagem será enviada diretamente à <strong>Central de Mensagens</strong> do morador. <strong>NÃO cria ocorrência nem registro punitivo</strong> no histórico do condomínio.
+              </p>
+            </div>
+
+            {/* Telemetry info */}
+            <div className="p-3 rounded-xl bg-space-950 border border-white/5 flex items-center justify-between text-xs">
+              <span className="text-slate-400">Leitura acústica atual da unidade:</span>
+              <span className="font-mono font-bold text-amber-400">
+                {preventiveModalApartment.current_db?.toFixed(1) || '74.5'} dB SPL
+              </span>
+            </div>
+
+            <form onSubmit={handleSendPreventive} className="space-y-3.5 text-xs">
+              <div>
+                <label className="text-slate-400 block mb-1">Assunto da Mensagem:</label>
+                <input
+                  type="text"
+                  value={preventiveSubject}
+                  onChange={e => setPreventiveSubject(e.target.value)}
+                  className="w-full bg-space-950 border border-white/15 rounded-xl p-2.5 text-white focus:outline-none focus:border-violet-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-400 block mb-1">Mensagem Inicial:</label>
+                <textarea
+                  rows={4}
+                  value={preventiveMessage}
+                  onChange={e => setPreventiveMessage(e.target.value)}
+                  placeholder="Escreva a mensagem de orientação para o morador..."
+                  className="w-full bg-space-950 border border-white/15 rounded-xl p-2.5 text-white focus:outline-none focus:border-violet-500 resize-none leading-relaxed"
+                  required
+                />
+              </div>
+
+              {/* Modelos rápidos */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] text-slate-500 uppercase font-bold block">Modelos Rápidos:</span>
+                <div className="flex flex-col gap-1.5 text-[11px]">
+                  {[
+                    'Solicitamos atenção ao volume de aparelhos sonoros conforme convenção.',
+                    'Detectamos ruído persistente nesta unidade no monitoramento predial. Favor verificar.',
+                    'Lembramos que após às 22h vigora o horário de silêncio rigoroso.'
+                  ].map((tpl, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setPreventiveMessage(`Olá morador do Apto ${preventiveModalApartment.number}! ${tpl} Agradecemos a compreensão e colaboração.`)}
+                      className="text-left px-2.5 py-1.5 rounded-lg bg-space-950/80 border border-white/5 hover:border-violet-500/30 text-slate-300 hover:text-white transition"
+                    >
+                      • {tpl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setPreventiveModalApartment(null)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSendingPreventive || !preventiveMessage.trim()}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 text-white font-bold shadow-glow-purple transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSendingPreventive ? 'Enviando...' : 'Iniciar Conversa Preventiva'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

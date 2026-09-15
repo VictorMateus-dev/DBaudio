@@ -203,6 +203,62 @@ export interface OccurrenceComment {
   author_name?: string;
 }
 
+export type ConversationType = 'ocorrencia' | 'preventivo';
+export type ConversationStatus = 'aberta' | 'fechada' | 'arquivada';
+
+export interface Conversation {
+  id: string;
+  condominium_id: string;
+  apartment_id: string;
+  apartment_number?: string;
+  occurrence_id?: string | null;
+  created_by?: string;
+  title: string;
+  subject?: string;
+  type: ConversationType;
+  status: ConversationStatus;
+  created_at: string;
+  updated_at: string;
+  last_message?: string;
+  unread_count?: number;
+}
+
+export interface ConversationMessage {
+  id: string;
+  conversation_id: string;
+  sender_id?: string;
+  recipient_id?: string;
+  sender_name: string;
+  sender_role?: 'syndic' | 'resident';
+  message: string;
+  content?: string;
+  read: boolean;
+  created_at: string;
+}
+
+export interface CreateConversationDTO {
+  condominium_id?: string;
+  apartment_id?: string;
+  apartment_number?: string;
+  occurrence_id?: string | null;
+  type: ConversationType;
+  title?: string;
+  subject?: string;
+  initial_message?: string;
+  sender_id?: string;
+  sender_name?: string;
+}
+
+export interface SendMessageDTO {
+  conversation_id: string;
+  sender_id?: string;
+  recipient_id?: string;
+  sender_name: string;
+  sender_role?: 'syndic' | 'resident';
+  message?: string;
+  content?: string;
+}
+
 export interface UserHistoryReport {
   profile: Profile;
   apartment?: Apartment | null;

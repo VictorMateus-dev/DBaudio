@@ -3,7 +3,9 @@ import {
   Apartment, Device, Sensor, NoiseReading, 
   NoiseEvent, Alert, Occurrence, OccurrenceComment, NoisePolicy, Profile,
   UserHistoryReport, CreateApartmentDTO, UpdateApartmentThresholdsDTO,
-  SimulatedFine, CreateFineDTO, OccurrenceStatus
+  SimulatedFine, CreateFineDTO, OccurrenceStatus,
+  Conversation, ConversationMessage, CreateConversationDTO, SendMessageDTO,
+  ConversationType, ConversationStatus
 } from '../types/database.types';
 import { currentBillingProvider } from './billingProvider';
 
@@ -145,6 +147,73 @@ const initialComments: Record<string, OccurrenceComment[]> = {
   occ1: [
     { id: 'c1', occurrence_id: 'occ1', author_id: 'admin1', author_name: 'Carlos Síndico Geral', comment: 'Notificação orientativa enviada preventivamente ao morador do apartamento citado via painel.', created_at: new Date(Date.now() - 3600000 * 1.5).toISOString() },
     { id: 'c2', occurrence_id: 'occ1', author_id: 'bbbb2222-0000-0000-0000-000000000101', author_name: 'João Silva', comment: 'Ruído cessou por volta das 23h45. Agradeço a rápida intervenção!', created_at: new Date(Date.now() - 3600000 * 0.5).toISOString() },
+  ]
+};
+
+const initialConversations: Conversation[] = [
+  {
+    id: 'conv-occ-1',
+    condominium_id: DEFAULT_CONDO_ID,
+    apartment_id: initialApartments[4].id, // Apto 202
+    apartment_number: '202',
+    occurrence_id: 'occ1',
+    created_by: 'aaaa1111-0000-0000-0000-000000000001',
+    title: 'Ocorrência #001 — Música Alta e Batidas',
+    type: 'ocorrencia',
+    status: 'aberta',
+    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 1.5).toISOString(),
+    last_message: 'Olá Síndico, já reduzimos o volume. Desculpe pelo transtorno.',
+    unread_count: 0,
+  },
+  {
+    id: 'conv-prev-103',
+    condominium_id: DEFAULT_CONDO_ID,
+    apartment_id: initialApartments[2].id, // Apto 103
+    apartment_number: '103',
+    occurrence_id: null,
+    created_by: 'aaaa1111-0000-0000-0000-000000000001',
+    title: 'Contato Preventivo — Ruído Elevado (74.5 dB)',
+    type: 'preventivo',
+    status: 'aberta',
+    created_at: new Date(Date.now() - 3600000 * 1).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 1).toISOString(),
+    last_message: 'Olá, identificamos ruído sonoro de 74.5 dB pelo sensor acústico. Poderia verificar preventivamente?',
+    unread_count: 1,
+  }
+];
+
+const initialMessages: Record<string, ConversationMessage[]> = {
+  'conv-occ-1': [
+    {
+      id: 'm1',
+      conversation_id: 'conv-occ-1',
+      sender_id: 'aaaa1111-0000-0000-0000-000000000001',
+      sender_name: 'Carlos Síndico Geral',
+      message: 'Olá! Recebemos relatos de som mecânico com graves elevados nesta unidade após às 22h. Poderia verificar e adequar o volume?',
+      read: true,
+      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+    },
+    {
+      id: 'm2',
+      conversation_id: 'conv-occ-1',
+      sender_id: 'cccc3333-0000-0000-0000-000000000202',
+      sender_name: 'Mariana Oliveira (Apto 202)',
+      message: 'Olá Síndico, já reduzimos o volume. Desculpe pelo transtorno.',
+      read: true,
+      created_at: new Date(Date.now() - 3600000 * 1.5).toISOString(),
+    }
+  ],
+  'conv-prev-103': [
+    {
+      id: 'm3',
+      conversation_id: 'conv-prev-103',
+      sender_id: 'aaaa1111-0000-0000-0000-000000000001',
+      sender_name: 'Carlos Síndico Geral',
+      message: 'Olá! Identificamos ruído sonoro de 74.5 dB pelo sensor acústico em seu apartamento. Poderia verificar preventivamente para mantermos o sossego coletivo?',
+      read: false,
+      created_at: new Date(Date.now() - 3600000 * 1).toISOString(),
+    }
   ]
 };
 
@@ -291,6 +360,63 @@ export function saveStoredFines(fines: SimulatedFine[]) {
   }
 }
 
+const CONVERSATIONS_STORAGE_KEY = 'dbsound_conversations';
+const MESSAGES_STORAGE_KEY = 'dbsound_messages';
+
+export function getStoredConversations(): Conversation[] {
+  if (typeof window === 'undefined') return [...initialConversations];
+  try {
+    const raw = localStorage.getItem(CONVERSATIONS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const map = new Map(parsed.map((c: Conversation) => [c.id, c]));
+        initialConversations.forEach(ic => {
+          if (!map.has(ic.id)) parsed.push(ic);
+        });
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Erro ao ler dbsound_conversations do localStorage:', e);
+  }
+  return [...initialConversations];
+}
+
+export function saveStoredConversations(convs: Conversation[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify(convs));
+  } catch (e) {
+    console.warn('Erro ao salvar dbsound_conversations no localStorage:', e);
+  }
+}
+
+export function getStoredMessages(): Record<string, ConversationMessage[]> {
+  if (typeof window === 'undefined') return { ...initialMessages };
+  try {
+    const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return { ...initialMessages, ...parsed };
+      }
+    }
+  } catch (e) {
+    console.warn('Erro ao ler dbsound_messages do localStorage:', e);
+  }
+  return { ...initialMessages };
+}
+
+export function saveStoredMessages(msgs: Record<string, ConversationMessage[]>) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(msgs));
+  } catch (e) {
+    console.warn('Erro ao salvar dbsound_messages no localStorage:', e);
+  }
+}
+
 // ============================================================================
 // STORE REATIVO LOCAL (Sincroniza com componentes e mantém estado persistente)
 // ============================================================================
@@ -303,6 +429,8 @@ class LocalDataStore {
   alerts = [...initialAlerts];
   occurrences: Occurrence[] = getStoredOccurrences();
   fines: SimulatedFine[] = getStoredFines();
+  conversations: Conversation[] = getStoredConversations();
+  messages: Record<string, ConversationMessage[]> = getStoredMessages();
   comments: Record<string, OccurrenceComment[]> = { ...initialComments };
   readings: NoiseReading[] = [];
   listeners: Array<() => void> = [];
@@ -333,6 +461,14 @@ class LocalDataStore {
 
   saveFines() {
     saveStoredFines(this.fines);
+  }
+
+  saveConversations() {
+    saveStoredConversations(this.conversations);
+  }
+
+  saveMessages() {
+    saveStoredMessages(this.messages);
   }
 
   saveProfile(profile: Profile) {
@@ -1466,6 +1602,261 @@ export const DataService = {
     }
     localStore.notify();
     return true;
+  },
+
+  // ============================================================================
+  // CONVERSAS, CHAT BIDIRECIONAL E CHAT PREVENTIVO
+  // ============================================================================
+  async getConversations(apartmentId?: string): Promise<Conversation[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        let query = supabase.from('conversations').select('*, apartments(number)').order('updated_at', { ascending: false });
+        if (apartmentId) {
+          query = query.eq('apartment_id', apartmentId);
+        }
+        const { data, error } = await query;
+        if (!error && data && Array.isArray(data)) {
+          const mapped: Conversation[] = data.map((c: any) => ({
+            ...c,
+            apartment_number: c.apartments?.number || c.apartment_number || 'N/A'
+          }));
+          const supaIds = new Set(mapped.map(m => m.id));
+          const localOnly = localStore.conversations.filter(lc => !supaIds.has(lc.id));
+          const merged = [...mapped, ...localOnly];
+          localStore.conversations = merged;
+          localStore.saveConversations();
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar conversas do Supabase:', e);
+      }
+    }
+
+    let result = localStore.conversations;
+    if (apartmentId) {
+      result = result.filter(c => c.apartment_id === apartmentId);
+    }
+
+    // Calcula unread_count e last_message para cada conversa
+    return result.map(conv => {
+      const msgs = localStore.messages[conv.id] || [];
+      const unread = msgs.filter(m => !m.read).length;
+      const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].message : conv.last_message;
+      return {
+        ...conv,
+        last_message: lastMsg,
+        unread_count: unread,
+      };
+    });
+  },
+
+  async getConversationById(id: string): Promise<Conversation | null> {
+    const convs = await this.getConversations();
+    return convs.find(c => c.id === id) || null;
+  },
+
+  async getConversationByOccurrenceId(occurrenceId: string): Promise<Conversation | null> {
+    const convs = await this.getConversations();
+    return convs.find(c => c.occurrence_id === occurrenceId) || null;
+  },
+
+  async createConversation(dto: CreateConversationDTO): Promise<Conversation> {
+    const generatedId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `00000000-0000-0000-0000-${Date.now().toString().padStart(12, '0')}`.slice(0, 36);
+
+    const title = dto.title || dto.subject || 'Conversa com Morador';
+    const aptId = dto.apartment_id || (localStore.apartments[0]?.id || '00000000-0000-0000-0000-000000000101');
+    let aptNumber = dto.apartment_number;
+    if (!aptNumber && aptId) {
+      const apt = localStore.apartments.find(a => a.id === aptId);
+      if (apt) aptNumber = apt.number;
+    }
+
+    const newConv: Conversation = {
+      id: generatedId,
+      condominium_id: dto.condominium_id || DEFAULT_CONDO_ID,
+      apartment_id: aptId,
+      apartment_number: aptNumber,
+      occurrence_id: dto.occurrence_id || null,
+      created_by: dto.sender_id,
+      title: title,
+      subject: title,
+      type: dto.type,
+      status: 'aberta',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_message: dto.initial_message,
+      unread_count: dto.initial_message ? 1 : 0,
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('conversations').insert({
+          id: newConv.id.includes('-') && newConv.id.length === 36 ? newConv.id : undefined,
+          condominium_id: newConv.condominium_id,
+          apartment_id: newConv.apartment_id,
+          occurrence_id: newConv.occurrence_id,
+          created_by: newConv.created_by || null,
+          title: newConv.title,
+          type: newConv.type,
+          status: newConv.status,
+          created_at: newConv.created_at,
+          updated_at: newConv.updated_at,
+        });
+      } catch (err) {
+        console.warn('Erro ao inserir conversa no Supabase:', err);
+      }
+    }
+
+    localStore.conversations.unshift(newConv);
+    localStore.saveConversations();
+
+    if (dto.initial_message) {
+      await this.sendMessage({
+        conversation_id: newConv.id,
+        sender_id: dto.sender_id,
+        sender_name: dto.sender_name || 'Síndico Geral',
+        sender_role: 'syndic',
+        message: dto.initial_message,
+        content: dto.initial_message,
+      });
+    }
+
+    localStore.notify();
+    return newConv;
+  },
+
+  async getMessages(conversationId: string): Promise<ConversationMessage[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('conversation_messages')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: true });
+
+        if (!error && data && Array.isArray(data)) {
+          const supaIds = new Set(data.map(m => m.id));
+          const localMsgs = localStore.messages[conversationId] || [];
+          const localOnly = localMsgs.filter(lm => !supaIds.has(lm.id));
+          const merged = [...data, ...localOnly];
+          localStore.messages[conversationId] = merged;
+          localStore.saveMessages();
+          return merged;
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar mensagens do Supabase:', e);
+      }
+    }
+
+    return localStore.messages[conversationId] || [];
+  },
+
+  async sendMessage(dto: SendMessageDTO): Promise<ConversationMessage> {
+    const generatedId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `00000000-0000-0000-0000-${Date.now().toString().padStart(12, '0')}`.slice(0, 36);
+
+    const now = new Date().toISOString();
+    const msgText = dto.message || dto.content || '';
+    const newMsg: ConversationMessage = {
+      id: generatedId,
+      conversation_id: dto.conversation_id,
+      sender_id: dto.sender_id,
+      recipient_id: dto.recipient_id,
+      sender_name: dto.sender_name,
+      sender_role: dto.sender_role || (dto.sender_name.toLowerCase().includes('síndico') ? 'syndic' : 'resident'),
+      message: msgText,
+      content: msgText,
+      read: false,
+      created_at: now,
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('conversation_messages').insert({
+          id: newMsg.id.includes('-') && newMsg.id.length === 36 ? newMsg.id : undefined,
+          conversation_id: newMsg.conversation_id,
+          sender_id: newMsg.sender_id || null,
+          recipient_id: newMsg.recipient_id || null,
+          sender_name: newMsg.sender_name,
+          message: newMsg.message,
+          read: false,
+          created_at: newMsg.created_at,
+        });
+
+        // Atualiza timestamp da conversa
+        await supabase.from('conversations').update({ updated_at: now }).eq('id', dto.conversation_id);
+      } catch (err) {
+        console.warn('Erro ao inserir mensagem no Supabase:', err);
+      }
+    }
+
+    if (!localStore.messages[dto.conversation_id]) {
+      localStore.messages[dto.conversation_id] = [];
+    }
+    localStore.messages[dto.conversation_id].push(newMsg);
+    localStore.saveMessages();
+
+    // Atualiza conversa local
+    const conv = localStore.conversations.find(c => c.id === dto.conversation_id);
+    if (conv) {
+      conv.updated_at = now;
+      conv.last_message = newMsg.message;
+      localStore.saveConversations();
+    }
+
+    localStore.notify();
+    return newMsg;
+  },
+
+  async markMessagesAsRead(conversationId: string, currentUserId?: string): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        let query = supabase.from('conversation_messages').update({ read: true }).eq('conversation_id', conversationId);
+        if (currentUserId) {
+          query = query.neq('sender_id', currentUserId);
+        }
+        await query;
+      } catch (e) {
+        console.warn('Erro ao marcar mensagens lidas no Supabase:', e);
+      }
+    }
+
+    const msgs = localStore.messages[conversationId];
+    if (msgs) {
+      msgs.forEach(m => {
+        if (!currentUserId || m.sender_id !== currentUserId) {
+          m.read = true;
+        }
+      });
+      localStore.saveMessages();
+    }
+
+    const conv = localStore.conversations.find(c => c.id === conversationId);
+    if (conv) {
+      conv.unread_count = 0;
+      localStore.saveConversations();
+    }
+
+    localStore.notify();
+  },
+
+  async getUnreadMessagesCount(apartmentId?: string, isSyndic?: boolean): Promise<number> {
+    const allConvs = await this.getConversations(apartmentId);
+    let totalUnread = 0;
+
+    for (const conv of allConvs) {
+      const msgs = localStore.messages[conv.id] || [];
+      if (isSyndic) {
+        // Mensagens não lidas enviadas por moradores
+        totalUnread += msgs.filter(m => !m.read && m.sender_name !== 'Carlos Síndico Geral' && !m.sender_name.toLowerCase().includes('síndico')).length;
+      } else {
+        // Mensagens não lidas enviadas pela administração
+        totalUnread += msgs.filter(m => !m.read && (m.sender_name.toLowerCase().includes('síndico') || m.sender_name.toLowerCase().includes('administração'))).length;
+      }
+    }
+    return totalUnread;
   },
 
   // PIPELINE ÚNICO: INGESTÃO DE LEITURA (SIMULADOR, MANUAL OU ESP32)

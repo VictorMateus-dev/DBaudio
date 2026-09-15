@@ -1,17 +1,19 @@
 import React from 'react';
 import { Apartment } from '../types/database.types';
-import { Volume2, WifiOff, ChevronRight, Activity } from 'lucide-react';
+import { Volume2, WifiOff, ChevronRight, Activity, MessageSquare } from 'lucide-react';
 
 interface FloorPlanGridProps {
   apartments: Apartment[];
   onSelectApartment: (apartment: Apartment) => void;
   selectedApartmentId?: string;
+  onPreventiveContact?: (apartment: Apartment) => void;
 }
 
 export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
   apartments,
   onSelectApartment,
   selectedApartmentId,
+  onPreventiveContact,
 }) => {
   // Organizar andares dinamicamente com base nos apartamentos cadastrados
   const detectedFloors = Array.from(new Set(apartments.map(a => a.floor || 1))).sort((a, b) => b - a);
@@ -153,9 +155,25 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
                             ☀️ {apt.custom_day_threshold_db ?? 70} dB • 🌙 {apt.custom_night_threshold_db ?? 60} dB
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-500 text-[10px]">3 sensores calibrados</span>
-                          <span className="flex items-center text-violet-400 hover:text-violet-300 font-medium transition">
+                        <div className="flex items-center justify-between text-[11px] pt-1">
+                          {onPreventiveContact ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onPreventiveContact(apt);
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-600/20 hover:bg-violet-600/40 text-violet-300 hover:text-white border border-violet-500/30 text-[10px] font-bold transition shadow-sm"
+                              title="Iniciar diálogo preventivo diretamente pelo monitoramento acústico"
+                            >
+                              <MessageSquare className="w-3 h-3 text-violet-400" />
+                              <span>💬 Contatar</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-500 text-[10px]">3 sensores calibrados</span>
+                          )}
+
+                          <span className="flex items-center text-violet-400 hover:text-violet-300 font-medium transition ml-auto">
                             Inspecionar <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                           </span>
                         </div>
