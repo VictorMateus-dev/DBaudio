@@ -59,6 +59,11 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   // Central de Mensagens do Morador
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const selectedConversationRef = React.useRef<Conversation | null>(null);
+  useEffect(() => {
+    selectedConversationRef.current = selectedConversation;
+  }, [selectedConversation]);
+
   const [activeMessages, setActiveMessages] = useState<ConversationMessage[]>([]);
   const [residentReplyText, setResidentReplyText] = useState('');
   const [isSendingReply, setIsSendingReply] = useState(false);
@@ -136,11 +141,49 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
     };
 
     fetchData();
-    const unsub = localStore.subscribe(() => {
+    const unsubLocal = localStore.subscribe(() => {
       fetchData();
     });
-    return () => unsub();
-  }, [effectiveApt.id, selectedConversation?.id]);
+
+    const unsubRealtime = DataService.subscribeToChatRealtime((event) => {
+      if (event.type === 'INSERT' && event.message) {
+        const newMsg = event.message;
+        console.log('[CHAT REALTIME MORADOR] evento recebido: INSERT');
+        console.log('message_id:', newMsg.id);
+        console.log('conversation_id:', newMsg.conversation_id);
+        console.log('sender_id:', newMsg.sender_id);
+
+        const currentOpenConv = selectedConversationRef.current;
+        if (currentOpenConv && newMsg.conversation_id === currentOpenConv.id) {
+          setActiveMessages(prev => {
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+          if (newMsg.sender_id !== user?.id) {
+            DataService.markMessagesAsRead(newMsg.conversation_id, user?.id);
+          }
+        } else {
+          fetchData();
+        }
+      } else if (event.type === 'UPDATE' && event.message) {
+        const updatedMsg = event.message;
+        const currentOpenConv = selectedConversationRef.current;
+        if (currentOpenConv && updatedMsg.conversation_id === currentOpenConv.id) {
+          setActiveMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+        }
+      } else if (event.type === 'READ_RECEIPT' && event.conversation_id) {
+        const currentOpenConv = selectedConversationRef.current;
+        if (currentOpenConv && event.conversation_id === currentOpenConv.id) {
+          setActiveMessages(prev => prev.map(m => (!m.read_at && m.sender_id === user?.id) ? { ...m, read: true, read_at: event.read_at || new Date().toISOString() } : m));
+        }
+      }
+    });
+
+    return () => {
+      unsubLocal();
+      unsubRealtime();
+    };
+  }, [effectiveApt.id, selectedConversation?.id, user?.id]);
 
   const handleOpenConversation = async (conv: Conversation) => {
     setSelectedConversation(conv);
@@ -583,7 +626,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                             </div>
                             {isMe && (
                               <div className="text-[9px] text-slate-500 mt-0.5 flex items-center gap-1">
-                                <span>{msg.read ? '✓✓ Visualizada' : '✓ Enviada'}</span>
+                                <span>{msg.read_at ? '✓✓ Visualizada' : '✓ Enviada'}</span>
                               </div>
                             )}
                           </div>

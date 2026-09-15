@@ -12,6 +12,11 @@ import { currentBillingProvider } from './billingProvider';
 export const DEFAULT_CONDO_ID = '00000000-0000-0000-0000-000000000001';
 export const DEFAULT_BUILDING_ID = '00000000-0000-0000-0000-000000000002';
 
+// BroadcastChannel para sincronização instantânea de chat entre abas/janelas locais
+export const chatBroadcastChannel = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined'
+  ? new BroadcastChannel('dbsound_chat_realtime_sync')
+  : null;
+
 // ============================================================================
 // DADOS DE DEMONSTRAÇÃO / BASELINE INICIAL
 // ============================================================================
@@ -231,6 +236,7 @@ const initialMessages: Record<string, ConversationMessage[]> = {
       message: 'Olá morador do Apto 101, identificamos leitura acústica de 72 dB. Poderia verificar preventivamente o volume?',
       content: 'Olá morador do Apto 101, identificamos leitura acústica de 72 dB. Poderia verificar preventivamente o volume?',
       read: true,
+      read_at: new Date(Date.now() - 3600000 * 3.8).toISOString(),
       created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
     },
     {
@@ -243,6 +249,7 @@ const initialMessages: Record<string, ConversationMessage[]> = {
       message: 'Boa noite Síndico, já reduzimos o volume do som.',
       content: 'Boa noite Síndico, já reduzimos o volume do som.',
       read: true,
+      read_at: new Date(Date.now() - 3600000 * 3.4).toISOString(),
       created_at: new Date(Date.now() - 3600000 * 3.5).toISOString(),
     }
   ],
@@ -257,6 +264,7 @@ const initialMessages: Record<string, ConversationMessage[]> = {
       message: 'Olá morador do Apto 203! Registramos queixa de som mecânico após às 22h. Solicitamos adequação imediata.',
       content: 'Olá morador do Apto 203! Registramos queixa de som mecânico após às 22h. Solicitamos adequação imediata.',
       read: true,
+      read_at: new Date(Date.now() - 3600000 * 2.8).toISOString(),
       created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
     },
     {
@@ -269,6 +277,7 @@ const initialMessages: Record<string, ConversationMessage[]> = {
       message: 'Olá Síndico, desculpe pelo barulho da TV, já desligamos.',
       content: 'Olá Síndico, desculpe pelo barulho da TV, já desligamos.',
       read: true,
+      read_at: new Date(Date.now() - 3600000 * 2.4).toISOString(),
       created_at: new Date(Date.now() - 3600000 * 2.5).toISOString(),
     }
   ],
@@ -283,6 +292,7 @@ const initialMessages: Record<string, ConversationMessage[]> = {
       message: 'Identificamos picos de 78 dB. Favor adequar ao regimento interno do condomínio para evitar penalidades.',
       content: 'Identificamos picos de 78 dB. Favor adequar ao regimento interno do condomínio para evitar penalidades.',
       read: false,
+      read_at: null,
       created_at: new Date(Date.now() - 3600000 * 1.5).toISOString(),
     }
   ],
@@ -297,6 +307,7 @@ const initialMessages: Record<string, ConversationMessage[]> = {
       message: 'Recebemos queixas de ruído de salto repetido no Apto 402. Solicitamos atenção ao piso e acústica.',
       content: 'Recebemos queixas de ruído de salto repetido no Apto 402. Solicitamos atenção ao piso e acústica.',
       read: false,
+      read_at: null,
       created_at: new Date(Date.now() - 3600000 * 0.5).toISOString(),
     }
   ]
@@ -1954,7 +1965,8 @@ export const DataService = {
         sender_role: role,
         message: msgText,
         content: msgText,
-        read: Boolean(m.read),
+        read: Boolean(m.read || m.read_at),
+        read_at: m.read_at || (m.read ? m.created_at : null),
         created_at: m.created_at || new Date().toISOString(),
       };
     }).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -1992,6 +2004,7 @@ export const DataService = {
       message: msgText,
       content: msgText,
       read: false,
+      read_at: null,
       created_at: now,
     };
 
@@ -2006,6 +2019,7 @@ export const DataService = {
           sender_role: newMsg.sender_role,
           message: newMsg.message,
           read: false,
+          read_at: null,
           created_at: newMsg.created_at,
         });
 
@@ -2031,13 +2045,27 @@ export const DataService = {
     }
 
     localStore.notify();
+
+    // Dispara sincronização instantânea em tempo real entre abas/janelas
+    if (chatBroadcastChannel) {
+      chatBroadcastChannel.postMessage({
+        type: 'INSERT',
+        message: newMsg,
+      });
+    }
+
     return newMsg;
   },
 
   async markMessagesAsRead(conversationId: string, currentUserId?: string): Promise<void> {
+    const now = new Date().toISOString();
     if (isSupabaseConfigured && supabase) {
       try {
-        let query = supabase.from('conversation_messages').update({ read: true }).eq('conversation_id', conversationId);
+        let query = supabase
+          .from('conversation_messages')
+          .update({ read: true, read_at: now })
+          .eq('conversation_id', conversationId)
+          .is('read_at', null);
         if (currentUserId) {
           query = query.neq('sender_id', currentUserId);
         }
@@ -2051,8 +2079,9 @@ export const DataService = {
     let hasChanged = false;
     if (msgs) {
       msgs.forEach(m => {
-        if ((!currentUserId || m.sender_id !== currentUserId) && !m.read) {
+        if ((!currentUserId || m.sender_id !== currentUserId) && (!m.read || !m.read_at)) {
           m.read = true;
+          m.read_at = now;
           hasChanged = true;
         }
       });
@@ -2070,7 +2099,98 @@ export const DataService = {
 
     if (hasChanged) {
       localStore.notify();
+      if (chatBroadcastChannel) {
+        chatBroadcastChannel.postMessage({
+          type: 'READ_RECEIPT',
+          conversation_id: conversationId,
+          read_at: now,
+        });
+      }
     }
+  },
+
+  // Inscreve-se no canal de eventos em tempo real (Supabase Realtime + BroadcastChannel local)
+  subscribeToChatRealtime(callback: (event: {
+    type: 'INSERT' | 'UPDATE' | 'READ_RECEIPT';
+    message?: ConversationMessage;
+    conversation_id?: string;
+    read_at?: string;
+  }) => void): () => void {
+    // 1. Escuta eventos locais via BroadcastChannel (multi-abas e multi-janelas instantâneo sem F5)
+    const handleBroadcast = (evt: MessageEvent) => {
+      if (evt.data) {
+        callback(evt.data);
+      }
+    };
+    if (chatBroadcastChannel) {
+      chatBroadcastChannel.addEventListener('message', handleBroadcast);
+    }
+
+    // 2. Escuta eventos remotos do Supabase Realtime via WebSocket (se conectado)
+    let channel: any = null;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const channelName = `rt-chat-${Math.random().toString(36).substring(2, 9)}`;
+        channel = supabase
+          .channel(channelName)
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'conversation_messages' },
+            (payload: any) => {
+              console.log('[CHAT REALTIME] evento recebido: INSERT', payload.new);
+              const m = payload.new;
+              const newMsg: ConversationMessage = {
+                id: m.id,
+                conversation_id: m.conversation_id,
+                sender_id: m.sender_id,
+                recipient_id: m.recipient_id,
+                sender_name: m.sender_name,
+                sender_role: m.sender_role || 'syndic',
+                message: m.message,
+                content: m.message,
+                read: Boolean(m.read || m.read_at),
+                read_at: m.read_at || null,
+                created_at: m.created_at,
+              };
+              callback({ type: 'INSERT', message: newMsg });
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'conversation_messages' },
+            (payload: any) => {
+              console.log('[CHAT REALTIME] evento recebido: UPDATE', payload.new);
+              const m = payload.new;
+              const updatedMsg: ConversationMessage = {
+                id: m.id,
+                conversation_id: m.conversation_id,
+                sender_id: m.sender_id,
+                recipient_id: m.recipient_id,
+                sender_name: m.sender_name,
+                sender_role: m.sender_role || 'syndic',
+                message: m.message,
+                content: m.message,
+                read: Boolean(m.read || m.read_at),
+                read_at: m.read_at || null,
+                created_at: m.created_at,
+              };
+              callback({ type: 'UPDATE', message: updatedMsg });
+            }
+          )
+          .subscribe();
+      } catch (err) {
+        console.warn('Erro ao conectar ao Realtime Supabase de mensagens:', err);
+      }
+    }
+
+    return () => {
+      if (chatBroadcastChannel) {
+        chatBroadcastChannel.removeEventListener('message', handleBroadcast);
+      }
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+      }
+    };
   },
 
   async getUnreadMessagesCount(apartmentId?: string, isSyndic?: boolean): Promise<number> {

@@ -243,6 +243,7 @@ export interface ConversationMessage {
   message: string;
   content: string;
   read: boolean;
+  read_at?: string | null;
   created_at: string;
 }
 

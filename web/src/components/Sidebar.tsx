@@ -23,6 +23,7 @@ interface SidebarProps {
   openOccurrencesCount: number;
   pendingResidentsCount?: number;
   unreadMessagesCount?: number;
+  onClose?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -32,6 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   openOccurrencesCount,
   pendingResidentsCount = 0,
   unreadMessagesCount = 0,
+  onClose,
 }) => {
   const { role, switchRole, user, logout } = useAuth();
 
@@ -47,22 +49,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="w-64 h-full shrink-0 bg-space-900/95 backdrop-blur-xl border-r border-white/5 flex flex-col justify-between z-10 select-none">
+    <aside className="w-full lg:w-[260px] h-full shrink-0 bg-space-900/95 backdrop-blur-xl border-r border-white/5 flex flex-col justify-between z-10 select-none">
       <div>
         {/* Vaultflow Logo & Brand */}
-        <div className="p-6 border-b border-white/5 flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-white shadow-glow-purple">
-            <Volume2 className="w-6 h-6" />
+        <div className="p-6 border-b border-white/5 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-white shadow-glow-purple">
+              <Volume2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="font-extrabold text-base tracking-tight text-white flex items-center gap-1.5">
+                dBSound
+                <span className="text-[9px] uppercase font-bold tracking-widest bg-violet-500/20 text-violet-300 border border-violet-500/30 px-1.5 py-0.5 rounded-full">
+                  SaaS
+                </span>
+              </h1>
+              <p className="text-[11px] text-slate-400">Acoustic Intelligence</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-extrabold text-base tracking-tight text-white flex items-center gap-1.5">
-              dBSound
-              <span className="text-[9px] uppercase font-bold tracking-widest bg-violet-500/20 text-violet-300 border border-violet-500/30 px-1.5 py-0.5 rounded-full">
-                SaaS
-              </span>
-            </h1>
-            <p className="text-[11px] text-slate-400">Acoustic Intelligence</p>
-          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="lg:hidden p-1.5 rounded-xl bg-white/5 text-slate-400 hover:text-white"
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         {/* Navigation Items */}
@@ -73,7 +85,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             return (
               <button
                 key={item.id}
-                onClick={() => onSelectTab(item.id)}
+                onClick={() => {
+                  onSelectTab(item.id);
+                  if (onClose) onClose();
+                }}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 ${
                   isActive
                     ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-glow-purple'

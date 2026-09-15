@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams, Outlet } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardOverview } from './pages/DashboardOverview';
@@ -13,6 +14,7 @@ import { SimulatorLabPage } from './pages/SimulatorLabPage';
 import { MessagesManagementPage } from './pages/MessagesManagementPage';
 import { ResidentMobileView } from './pages/ResidentMobileView';
 import { LoginPage } from './pages/LoginPage';
+import { BoletoPage } from './pages/BoletoPage';
 import { useAuth } from './contexts/AuthContext';
 import { DataService, localStore } from './lib/dataService';
 import { supabase, isSupabaseConfigured } from './lib/supabaseClient';
@@ -110,6 +112,7 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Determina aba ativa pela URL
   const path = location.pathname;
@@ -138,19 +141,58 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
   };
 
   return (
-    <div className="grid h-screen w-screen bg-space-950 text-slate-100 overflow-hidden grid-cols-[16rem_minmax(0,1fr)]">
-      {/* Sidebar na coluna 1 (16rem fixa, sem sobreposição) */}
-      <Sidebar
-        currentTab={currentTab}
-        onSelectTab={handleSelectTab}
-        openAlertsCount={alerts.filter(a => !a.read).length}
-        openOccurrencesCount={occurrences.filter(o => o.status === 'aberta').length}
-        pendingResidentsCount={pendingResidentsCount}
-        unreadMessagesCount={unreadMessagesCount}
-      />
+    <div className="h-screen w-screen bg-space-950 text-slate-100 overflow-hidden lg:grid lg:grid-cols-[260px_minmax(0,1fr)] flex flex-col">
+      {/* 1. Sidebar Desktop: Coluna 1 do Grid (260px estrito, sem sobreposição) */}
+      <div className="hidden lg:block h-full w-[260px] shrink-0">
+        <Sidebar
+          currentTab={currentTab}
+          onSelectTab={handleSelectTab}
+          openAlertsCount={alerts.filter(a => !a.read).length}
+          openOccurrencesCount={occurrences.filter(o => o.status === 'aberta').length}
+          pendingResidentsCount={pendingResidentsCount}
+          unreadMessagesCount={unreadMessagesCount}
+        />
+      </div>
 
-      {/* Área principal do Síndico na coluna 2 (ocupa estritamente o espaço restante) */}
-      <div className="flex flex-col h-full min-w-0 overflow-y-auto">
+      {/* 2. Top-bar Mobile com Hambúrguer (☰ Ocorrências / dBSound) */}
+      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-space-900 border-b border-white/10 shrink-0 select-none">
+        <button
+          type="button"
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="flex items-center gap-2.5 text-white font-bold text-sm hover:text-violet-300 transition"
+        >
+          <Menu className="w-5 h-5 text-violet-400" />
+          <span>{currentTab === 'occurrences' ? 'Ocorrências & Decisões' : 'dBSound Síndico'}</span>
+        </button>
+
+        <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+          Admin
+        </span>
+      </div>
+
+      {/* 3. Mobile Drawer Overlay (quando hambúrguer aberto) */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex animate-fadeIn">
+          <div 
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity" 
+            onClick={() => setIsMobileMenuOpen(false)} 
+          />
+          <div className="relative w-[270px] h-full z-10 shadow-2xl bg-space-900 flex flex-col">
+            <Sidebar
+              currentTab={currentTab}
+              onSelectTab={handleSelectTab}
+              onClose={() => setIsMobileMenuOpen(false)}
+              openAlertsCount={alerts.filter(a => !a.read).length}
+              openOccurrencesCount={occurrences.filter(o => o.status === 'aberta').length}
+              pendingResidentsCount={pendingResidentsCount}
+              unreadMessagesCount={unreadMessagesCount}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 4. Área Principal do Conteúdo: Coluna 2 do Grid (ou tela cheia no mobile) */}
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
         <Header
           alerts={alerts}
           onSelectApartment={(aptId) => {
@@ -464,7 +506,10 @@ export const App: React.FC = () => {
         }
       />
 
-      {/* 4. Rota Raiz - Despacha inteligentemente conforme o perfil logado */}
+      {/* 4. Rota Isolada para Impressão de Cobrança Simulada (Boleto) */}
+      <Route path="/boleto/:multaId" element={<BoletoPage />} />
+
+      {/* 5. Rota Raiz - Despacha inteligentemente conforme o perfil logado */}
       <Route
         path="/"
         element={

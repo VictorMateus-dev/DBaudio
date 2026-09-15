@@ -72,11 +72,58 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
 
   useEffect(() => {
     loadConversations();
-    const unsub = localStore.subscribe(() => {
+    const unsubLocal = localStore.subscribe(() => {
       loadConversations();
     });
-    return () => unsub();
-  }, [loadConversations]);
+
+    // Subscrição unificada em tempo real (Supabase Realtime + BroadcastChannel local)
+    const unsubRealtime = DataService.subscribeToChatRealtime((event) => {
+      if (event.type === 'INSERT' && event.message) {
+        const newMsg = event.message;
+        console.log('[CHAT REALTIME] evento recebido: INSERT');
+        console.log('message_id:', newMsg.id);
+        console.log('conversation_id:', newMsg.conversation_id);
+        console.log('sender_id:', newMsg.sender_id);
+
+        const currentActiveId = selectedConversationIdRef.current;
+        if (newMsg.conversation_id === currentActiveId) {
+          // Se pertence à conversa aberta, adiciona com deduplicação por ID
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+          // Se for do morador, marca como lida
+          if (newMsg.sender_id !== user?.id) {
+            DataService.markMessagesAsRead(newMsg.conversation_id, user?.id);
+          }
+        } else {
+          // Se pertence a outra conversa: NUNCA muda a conversa selecionada!
+          // Apenas atualiza a lista de conversas e preview
+          loadConversations();
+        }
+      } else if (event.type === 'UPDATE' && event.message) {
+        const updatedMsg = event.message;
+        console.log('[CHAT REALTIME] evento recebido: UPDATE');
+        console.log('message_id:', updatedMsg.id);
+        console.log('conversation_id:', updatedMsg.conversation_id);
+
+        const currentActiveId = selectedConversationIdRef.current;
+        if (updatedMsg.conversation_id === currentActiveId) {
+          setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+        }
+      } else if (event.type === 'READ_RECEIPT' && event.conversation_id) {
+        const currentActiveId = selectedConversationIdRef.current;
+        if (event.conversation_id === currentActiveId) {
+          setMessages(prev => prev.map(m => (!m.read_at && m.sender_id === user?.id) ? { ...m, read: true, read_at: event.read_at || new Date().toISOString() } : m));
+        }
+      }
+    });
+
+    return () => {
+      unsubLocal();
+      unsubRealtime();
+    };
+  }, [loadConversations, user?.id]);
 
   const handleSelectConversation = async (convId: string) => {
     console.log('CLICKED CONVERSATION:', convId);
@@ -377,7 +424,7 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
 
                         <div className="text-[9px] text-slate-500 mt-0.5 flex items-center gap-1">
                           {isMe && (
-                            <span>{msg.read ? '✓✓ Visualizada' : '✓ Enviada'}</span>
+                            <span>{msg.read_at ? '✓✓ Visualizada' : '✓ Enviada'}</span>
                           )}
                         </div>
                       </div>
