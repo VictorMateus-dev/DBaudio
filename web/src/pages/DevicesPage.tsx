@@ -25,7 +25,7 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ devices, onRefresh }) 
 
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
+      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Inventário de Dispositivos ESP32</h1>
@@ -61,7 +61,7 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ devices, onRefresh }) 
         </div>
       </div>
 
-      {/* Hardware Security Note */}
+      
       <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex items-start space-x-3 text-xs text-slate-300">
         <Shield className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
         <div>
@@ -74,7 +74,7 @@ export const DevicesPage: React.FC<DevicesPageProps> = ({ devices, onRefresh }) 
         </div>
       </div>
 
-      {/* Devices Table */}
+      
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">

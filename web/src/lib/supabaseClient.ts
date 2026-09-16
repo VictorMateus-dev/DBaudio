@@ -1,13 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Função para sanitizar e normalizar a URL do Supabase
-// Remove caminhos extras comuns como /rest/v1, /auth/v1, barras finais ou aspas acidentais
 export function sanitizeSupabaseUrl(url: string): string {
   if (!url) return '';
   const clean = url.trim().replace(/^['"]|['"]$/g, '');
   try {
     const parsed = new URL(clean);
-    // Retorna estritamente o protocolo e o host (ex: https://abcdef.supabase.co)
     return `${parsed.protocol}//${parsed.host}`;
   } catch {
     return clean
@@ -35,7 +32,6 @@ export const isSupabaseConfigured = Boolean(
   !supabaseUrl.includes('seu-projeto')
 );
 
-// Cliente oficial Supabase
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {

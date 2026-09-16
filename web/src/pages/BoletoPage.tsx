@@ -54,7 +54,7 @@ export const BoletoPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col items-center p-4 sm:p-8">
-      {/* Barra de Ações Superior (Não impressa) */}
+      
       <div className="w-full max-w-2xl flex items-center justify-between mb-6 print:hidden">
         <button
           type="button"
@@ -75,12 +75,12 @@ export const BoletoPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Documento de Cobrança Isolado */}
+      
       <div 
         id="printable-boleto-area"
         className="w-full max-w-2xl bg-white rounded-2xl p-6 sm:p-8 border-2 border-slate-300 shadow-xl space-y-6 print:shadow-none print:border-none print:p-0 print:m-0"
       >
-        {/* Tarja de Aviso Legal Obrigatória */}
+        
         <div className="text-center border-b-2 border-dashed border-red-400 pb-3">
           <div className="inline-block px-3 py-1 bg-red-100 border border-red-300 rounded text-red-700 font-mono text-xs font-black uppercase tracking-wider">
             dBSound — COBRANÇA SIMULADA — SEM VALIDADE FINANCEIRA
@@ -90,7 +90,7 @@ export const BoletoPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Cabeçalho do Beneficiário */}
+        
         <div className="flex items-start justify-between border-b pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-violet-600 text-white font-black flex items-center justify-center text-sm">
@@ -116,7 +116,7 @@ export const BoletoPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Se cancelada, exibe banner explícito de cancelamento */}
+        
         {isCancelled && (
           <div className="p-3 bg-red-50 border border-red-300 rounded-xl text-red-800 text-xs">
             <strong>AVISO: ESTA MULTA FOI CANCELADA PELO SÍNDICO</strong>
@@ -124,7 +124,7 @@ export const BoletoPage: React.FC = () => {
           </div>
         )}
 
-        {/* Dados da Cobrança */}
+        
         <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
           <div>
             <span className="text-slate-500 text-[10px] uppercase font-bold block">Pagador:</span>
@@ -151,7 +151,7 @@ export const BoletoPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Linha Digitável e Código de Barras Simulado */}
+        
         <div className="space-y-2 border-t pt-4">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-slate-500 font-bold uppercase">Linha Digitável (Simulação):</span>
@@ -174,7 +174,7 @@ export const BoletoPage: React.FC = () => {
             {fine.barcode || '34191.79001 01043.510047 91020.150008 5 99990000015000'}
           </div>
 
-          {/* Gráfico Simulado do Código de Barras */}
+          
           <div className="py-3 px-4 bg-white border border-slate-200 rounded-lg flex flex-col items-center">
             <div className="flex items-center justify-center gap-[2px] h-12 w-full overflow-hidden max-w-md">
               {Array.from({ length: 70 }).map((_, i) => {
@@ -189,7 +189,7 @@ export const BoletoPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Rodapé do Documento */}
+        
         <div className="border-t pt-3 flex items-center justify-between text-[10px] text-slate-400">
           <span>Emitido digitalmente via Sistema dBSound</span>
           <span>Autenticação: SIMULADA-{fine.id.slice(0, 12)}</span>

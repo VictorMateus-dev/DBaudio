@@ -44,7 +44,6 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
   const { user } = useAuth();
   const [selectedSensorChannel, setSelectedSensorChannel] = useState<number>(1);
 
-  // Modal de Contato Preventivo
   const [isPreventiveModalOpen, setIsPreventiveModalOpen] = useState(false);
   const [preventiveSubject, setPreventiveSubject] = useState(`Aviso Preventivo de Ruído • Apto ${apartment.number}`);
   const [preventiveMessage, setPreventiveMessage] = useState(
@@ -75,7 +74,6 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
     }
   };
 
-  // Mock readings por sensor para detalhes ricos
   const currentDb = apartment.current_db || 45.0;
   const sensorReadings: Record<number, number> = {
     1: currentDb,
@@ -91,7 +89,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
 
   return (
     <div className="p-8 space-y-8 max-w-6xl mx-auto">
-      {/* Top Bar with Back button */}
+      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <button
           onClick={onBack}
@@ -120,7 +118,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
         </div>
       </div>
 
-      {/* Success Notification Banner */}
+      
       {preventiveSuccessMsg && (
         <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5 animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -128,7 +126,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
         </div>
       )}
 
-      {/* Main Apartment Card Banner */}
+      
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
@@ -143,7 +141,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
             </p>
           </div>
 
-          {/* Quick Metrics Pills */}
+          
           <div className="flex items-center space-x-4 bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
             <div className="text-center px-4">
               <span className="text-[11px] text-slate-400 block uppercase font-bold">Nível Atual</span>
@@ -163,9 +161,9 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
         </div>
       </div>
 
-      {/* Hardware & Sensor Breakdown Grid */}
+      
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Hardware Status */}
+        
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
           <div className="flex items-center space-x-2 text-sm font-semibold text-white">
             <Cpu className="w-4 h-4 text-blue-400" />
@@ -196,7 +194,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
           </div>
         </div>
 
-        {/* 3 Sensores MAX9814 (Sala, Quarto, Cozinha) */}
+        
         <div className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 text-sm font-semibold text-white">
@@ -240,7 +238,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
         </div>
       </div>
 
-      {/* Gráfico do Apartamento */}
+      
       <NoiseChart
         data={[
           { time: '17:00', decibel: Math.max(35, currentDb - 8) },
@@ -252,9 +250,9 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
         ]}
       />
 
-      {/* Ocorrências e Alertas Associados */}
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Alertas desta unidade */}
+        
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-red-400" />
@@ -277,7 +275,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
           )}
         </div>
 
-        {/* Ocorrências citando este apartamento */}
+        
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
@@ -302,9 +300,9 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* MODAL: CONTATO PREVENTIVO DO SÍNDICO (NÃO GERA DENÚNCIA) */}
-      {/* ========================================================================= */}
+      
+      
+      
       {isPreventiveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="vault-card rounded-3xl p-6 w-full max-w-lg space-y-4 border border-violet-500/30 shadow-2xl">
@@ -327,7 +325,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
               </button>
             </div>
 
-            {/* Disclaimer Explícito: NÃO CRIA OCORRÊNCIA */}
+            
             <div className="p-3 rounded-xl bg-violet-950/30 border border-violet-500/20 text-[11px] text-violet-300 space-y-1">
               <span className="font-bold flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
@@ -338,7 +336,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
               </p>
             </div>
 
-            {/* Telemetry info */}
+            
             <div className="p-3 rounded-xl bg-space-950 border border-white/5 flex items-center justify-between text-xs">
               <span className="text-slate-400">Nível sonoro atual medido:</span>
               <span className="font-mono font-bold text-amber-400">
@@ -370,7 +368,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
                 />
               </div>
 
-              {/* Modelos rápidos */}
+              
               <div className="space-y-1.5">
                 <span className="text-[10px] text-slate-500 uppercase font-bold block">Modelos de Mensagem:</span>
                 <div className="flex flex-col gap-1.5 text-[11px]">

@@ -1,10 +1,3 @@
--- =====================================================================
--- dBSound: Migration 004 — Correção Definitiva de Alocação e Acesso
--- Garante Condomínio/Bloco padrão, RPCs SECURITY DEFINER para alocação
--- atômica sem bloqueios de RLS e recuperação automática de perfis
--- =====================================================================
-
--- 1. GARANTIR QUE EXISTE CONDOMÍNIO E BLOCO PADRÃO PERSISTENTES
 INSERT INTO public.condominiums (id, name, address, created_at, updated_at)
 VALUES (
     '00000000-0000-0000-0000-000000000001'::UUID,
@@ -23,9 +16,6 @@ VALUES (
     now()
 )
 ON CONFLICT (id) DO NOTHING;
-
--- 2. AUTO-RECUPERAÇÃO NO TRIGGER DE NOVO USUÁRIO (auth.users)
--- Garante que default_condo_id nunca seja nulo, mesmo que o banco tenha sido limpo.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -33,7 +23,6 @@ DECLARE
 BEGIN
     SELECT id INTO default_condo_id FROM public.condominiums ORDER BY created_at ASC LIMIT 1;
     
-    -- Se não houver condomínio cadastrado, restaura o padrão imediatamente
     IF default_condo_id IS NULL THEN
         INSERT INTO public.condominiums (id, name, address, created_at, updated_at)
         VALUES ('00000000-0000-0000-0000-000000000001'::UUID, 'Condomínio Residencial Parque das Flores', 'Av. das Nações Unidas, 1000', now(), now())
@@ -76,9 +65,6 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 3. RPC: ALOCAÇÃO SEGURA DE MORADOR AO APARTAMENTO (SECURITY DEFINER)
--- Bypassa bloqueios de permissão do RLS e executa a alocação de forma atômica
 CREATE OR REPLACE FUNCTION public.assign_resident_to_apartment(
     p_profile_id UUID,
     p_apartment_id UUID
@@ -88,19 +74,14 @@ DECLARE
     v_apt_number TEXT;
     v_profile_name TEXT;
 BEGIN
-    -- Validar apartamento
     SELECT number INTO v_apt_number FROM public.apartments WHERE id = p_apartment_id;
     IF v_apt_number IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', 'Apartamento não encontrado.');
     END IF;
-
-    -- Validar perfil
     SELECT full_name INTO v_profile_name FROM public.profiles WHERE id = p_profile_id;
     IF v_profile_name IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', 'Perfil de morador não encontrado.');
     END IF;
-
-    -- Executar a atribuição
     UPDATE public.profiles
     SET apartment_id = p_apartment_id,
         role = 'resident',
@@ -118,8 +99,6 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 4. RPC: DESVINCULAR MORADOR DO APARTAMENTO
 CREATE OR REPLACE FUNCTION public.unassign_resident_from_apartment(
     p_profile_id UUID
 )
@@ -136,8 +115,6 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 5. RPC: CRIAR APARTAMENTO E ALOCAR MORADOR EM UMA ÚNICA AÇÃO
 CREATE OR REPLACE FUNCTION public.create_apartment_and_assign(
     p_number TEXT,
     p_floor INT DEFAULT 1,
@@ -151,7 +128,6 @@ DECLARE
     v_building_id UUID;
     v_new_apt RECORD;
 BEGIN
-    -- Obter o ID do bloco principal ou cadastrar se não existir
     SELECT id INTO v_building_id FROM public.buildings LIMIT 1;
     IF v_building_id IS NULL THEN
         INSERT INTO public.condominiums (id, name, address)
@@ -164,8 +140,6 @@ BEGIN
 
         v_building_id := '00000000-0000-0000-0000-000000000002'::UUID;
     END IF;
-
-    -- Inserir o novo apartamento
     INSERT INTO public.apartments (
         building_id,
         number,
@@ -184,8 +158,6 @@ BEGIN
         now()
     )
     RETURNING * INTO v_new_apt;
-
-    -- Se um morador foi especificado, alocar imediatamente
     IF p_profile_id IS NOT NULL THEN
         UPDATE public.profiles
         SET apartment_id = v_new_apt.id,
@@ -204,8 +176,6 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 6. RPC: AUTO-RECUPERAÇÃO DE PERFIL DO MORADOR
 CREATE OR REPLACE FUNCTION public.get_or_create_profile(
     p_user_id UUID,
     p_email TEXT,
@@ -242,8 +212,6 @@ BEGIN
         )
         RETURNING * INTO v_profile;
     END IF;
-
-    -- Obter número do apartamento se já alocado
     IF v_profile.apartment_id IS NOT NULL THEN
         SELECT number INTO v_apt_number FROM public.apartments WHERE id = v_profile.apartment_id;
     END IF;
@@ -265,8 +233,6 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 7. REAJUSTE DAS POLÍTICAS DE RLS PARA APARTAMENTOS E PERFIS
 DROP POLICY IF EXISTS "Moradores veem seu próprio apartamento" ON public.apartments;
 CREATE POLICY "Moradores veem seu próprio apartamento" ON public.apartments
     FOR SELECT USING (
@@ -278,8 +244,6 @@ CREATE POLICY "Moradores veem seu próprio apartamento" ON public.apartments
 DROP POLICY IF EXISTS "Leitura de perfis no condomínio" ON public.profiles;
 CREATE POLICY "Leitura de perfis no condomínio" ON public.profiles
     FOR SELECT USING (true);
-
--- 8. CONCEDER EXECUÇÃO DAS RPCS PARA OS ROLES PÚBLICOS DO SUPABASE
 GRANT EXECUTE ON FUNCTION public.assign_resident_to_apartment(UUID, UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.unassign_resident_from_apartment(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.create_apartment_and_assign(TEXT, INT, NUMERIC, NUMERIC, NUMERIC, UUID) TO authenticated, anon;

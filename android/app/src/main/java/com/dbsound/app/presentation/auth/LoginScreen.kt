@@ -35,7 +35,6 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // App Logo
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = BrandBlue,
@@ -129,7 +128,7 @@ fun LoginScreen(
                     }
 
                     TextButton(
-                        onClick = { /* Recuperar senha */ },
+                        onClick = {  },
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     ) {
                         Text(text = "Esqueceu a senha?", fontSize = 12.sp, color = BrandBlueLight)

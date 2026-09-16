@@ -52,7 +52,6 @@ fun HistoryScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Filter Pills Row
             item {
                 Row(
                     modifier = Modifier
@@ -79,7 +78,6 @@ fun HistoryScreen(
                 }
             }
 
-            // Visualizer Card (Curva dB x Tempo)
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -110,7 +108,6 @@ fun HistoryScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Mini Bar Graph Simulation
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -150,7 +147,6 @@ fun HistoryScreen(
                 }
             }
 
-            // Events List Header
             item {
                 Text(
                     text = "Episódios Registrados (${events.size})",
@@ -160,7 +156,6 @@ fun HistoryScreen(
                 )
             }
 
-            // Events Items
             items(events) { event ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),

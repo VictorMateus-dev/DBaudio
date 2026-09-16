@@ -35,7 +35,6 @@ class NoiseRepositoryImpl : NoiseRepository {
     override fun observeTelemetry(apartmentId: String): Flow<NoiseTelemetry> = flow {
         var baseDb = 48.0f
         while (true) {
-            // Simulação de telemetria contínua em tempo real (flutuação de ruído residencial normal)
             val jitter = (Random.nextFloat() - 0.5f) * 4f
             val current = (baseDb + jitter).coerceIn(38f, 98f)
             val status = when {

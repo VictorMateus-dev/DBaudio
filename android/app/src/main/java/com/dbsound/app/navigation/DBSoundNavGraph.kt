@@ -41,7 +41,6 @@ fun DBSoundApp() {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
     var isLoggedIn by remember { mutableStateOf(true) }
 
-    // Mock initial user
     val user = remember {
         UserProfile(
             id = "bbbb2222-0000-0000-0000-000000000101",
@@ -55,7 +54,6 @@ fun DBSoundApp() {
         )
     }
 
-    // Telemetria em tempo real
     val telemetry by noiseRepo.observeTelemetry(user.apartmentId ?: "").collectAsState(
         initial = NoiseTelemetry(
             currentDb = 48.0f,

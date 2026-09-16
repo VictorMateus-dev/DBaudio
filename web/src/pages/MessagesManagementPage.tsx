@@ -56,7 +56,6 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
       }
     }
 
-    // Auto-seleciona a primeira conversa SOMENTE na montagem inicial se nada estiver selecionado
     if (isInitialMountRef.current && convs.length > 0) {
       isInitialMountRef.current = false;
       const firstId = convs[0].id;
@@ -76,7 +75,6 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
       loadConversations();
     });
 
-    // Subscrição unificada em tempo real (Supabase Realtime + BroadcastChannel local)
     const unsubRealtime = DataService.subscribeToChatRealtime((event) => {
       if (event.type === 'INSERT' && event.message) {
         const newMsg = event.message;
@@ -87,18 +85,14 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
 
         const currentActiveId = selectedConversationIdRef.current;
         if (newMsg.conversation_id === currentActiveId) {
-          // Se pertence à conversa aberta, adiciona com deduplicação por ID
           setMessages(prev => {
             if (prev.some(m => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
-          // Se for do morador, marca como lida
           if (newMsg.sender_id !== user?.id) {
             DataService.markMessagesAsRead(newMsg.conversation_id, user?.id);
           }
         } else {
-          // Se pertence a outra conversa: NUNCA muda a conversa selecionada!
-          // Apenas atualiza a lista de conversas e preview
           loadConversations();
         }
       } else if (event.type === 'UPDATE' && event.message) {
@@ -167,7 +161,6 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
     }
   };
 
-  // Filtragem de conversas
   const filteredConversations = conversations.filter(conv => {
     const matchesSearch = 
       (conv.apartment_number && conv.apartment_number.includes(searchQuery)) ||
@@ -197,7 +190,7 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
 
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto animate-fadeIn">
-      {/* Top Header */}
+      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -217,11 +210,11 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
         </div>
       </div>
 
-      {/* Main Split Cockpit */}
+      
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Col: Conversation List */}
+        
         <div className="space-y-4">
-          {/* Search Bar */}
+          
           <div className="relative">
             <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -233,7 +226,7 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
             />
           </div>
 
-          {/* Filter Tabs */}
+          
           <div className="flex items-center gap-1 bg-space-900/80 p-1 rounded-xl border border-white/5 text-[11px]">
             {[
               { id: 'all', label: 'Todas' },
@@ -256,7 +249,7 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
             ))}
           </div>
 
-          {/* Conversation Cards Scroll */}
+          
           <div className="space-y-2.5 max-h-[640px] overflow-y-auto pr-1">
             {filteredConversations.length === 0 ? (
               <div className="p-8 text-center text-slate-500 text-xs vault-card rounded-2xl">
@@ -317,11 +310,11 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
           </div>
         </div>
 
-        {/* Right Col: Active Chat Window */}
+        
         <div className="lg:col-span-2">
           {activeConversation ? (
             <div className="vault-card rounded-3xl p-6 space-y-4 flex flex-col h-[740px] animate-fadeIn border border-white/10">
-              {/* Top Bar of Active Conversation */}
+              
               <div className="flex items-center justify-between pb-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-glow-purple">
@@ -358,7 +351,7 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
                 )}
               </div>
 
-              {/* Informative Banner */}
+              
               <div className={`p-3 rounded-2xl text-[11px] leading-relaxed flex items-center gap-2.5 ${
                 activeConversation.type === 'preventivo'
                   ? 'bg-amber-950/30 border border-amber-500/30 text-amber-300'
@@ -372,7 +365,7 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
                 </span>
               </div>
 
-              {/* Quick Template Buttons */}
+              
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
                 <span className="text-slate-500 text-[10px] shrink-0 font-bold uppercase">Respostas Rápidas:</span>
                 {[
@@ -391,7 +384,7 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
                 ))}
               </div>
 
-              {/* Message Thread */}
+              
               <div className="flex-1 overflow-y-auto p-4 space-y-3 rounded-2xl bg-space-950/70 border border-white/5">
                 {messages.length === 0 ? (
                   <div className="text-center py-16 text-slate-500 text-xs">
@@ -433,7 +426,7 @@ export const MessagesManagementPage: React.FC<MessagesManagementPageProps> = ({ 
                 )}
               </div>
 
-              {/* Reply Form */}
+              
               <form onSubmit={handleSendMessage} className="flex gap-2 pt-2 border-t border-white/10">
                 <input
                   type="text"

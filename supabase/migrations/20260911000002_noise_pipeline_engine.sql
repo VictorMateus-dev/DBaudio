@@ -1,11 +1,4 @@
--- =====================================================================
--- dBSound - Monitoramento Inteligente de Ruído Residencial
--- Migration 02: Pipeline Único de Processamento, Agrupamento e Alertas
--- =====================================================================
 
--- ---------------------------------------------------------------------
--- 1. FUNÇÃO DE INGESTÃO SEGURA PARA ESP32 (SEM SERVICE ROLE KEY NO CLIENTE)
--- ---------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.ingest_reading(
     p_device_uid TEXT,
@@ -20,7 +13,6 @@ DECLARE
     v_sensor_id UUID;
     v_reading_id UUID;
 BEGIN
-    -- Validar existência e credencial do dispositivo
     SELECT id, apartment_id, status INTO v_device
     FROM public.devices
     WHERE device_uid = p_device_uid AND secret_token = p_device_token;
@@ -33,18 +25,15 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'message', 'Dispositivo em manutenção.');
     END IF;
 
-    -- Localizar sensor correspondente ao canal
     SELECT id INTO v_sensor_id
     FROM public.sensors
     WHERE device_id = v_device.id AND channel = p_channel AND enabled = true
     LIMIT 1;
 
-    -- Atualizar status do dispositivo e heartbeat
     UPDATE public.devices
     SET status = 'online', last_seen_at = now(), updated_at = now()
     WHERE id = v_device.id;
 
-    -- Inserir telemetria (dispara automaticamente o pipeline unificado de ruído)
     INSERT INTO public.noise_readings (
         device_id,
         sensor_id,
@@ -73,9 +62,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- ---------------------------------------------------------------------
--- 2. ENGINE UNIFICADA DE PROCESSAMENTO DE RUÍDO (TRIGGER)
--- ---------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.process_noise_reading()
 RETURNS TRIGGER AS $$
@@ -94,7 +80,6 @@ DECLARE
     v_duration INTEGER;
     v_alert_exists BOOLEAN;
 BEGIN
-    -- Obter condomínio do apartamento
     SELECT b.condominium_id INTO v_condominium_id
     FROM public.apartments a
     JOIN public.buildings b ON a.building_id = b.id
@@ -102,8 +87,6 @@ BEGIN
 
     v_reading_time := (NEW.recorded_at AT TIME ZONE 'America/Sao_Paulo')::TIME;
 
-    -- Buscar política de ruído correspondente ao horário
-    -- Tratamento correto de períodos noturnos que cruzam a meia-noite (ex: 22:00 até 07:00)
     SELECT * INTO v_policy
     FROM public.noise_policies
     WHERE condominium_id = v_condominium_id
@@ -123,33 +106,27 @@ BEGIN
         v_min_duration := v_policy.min_duration_seconds;
         v_cooldown := v_policy.cooldown_seconds;
     ELSE
-        -- Fallback baseado nas regras do projeto se nenhuma política customizada for encontrada
         IF v_reading_time >= '22:00:00'::TIME OR v_reading_time < '07:00:00'::TIME THEN
-            -- Noturno: limite 60 dB
             v_threshold := 60.0;
             v_warning_threshold := 60.0;
             v_critical_threshold := 70.0;
         ELSE
-            -- Diurno: limite 70 dB
             v_threshold := 70.0;
             v_warning_threshold := 70.0;
             v_critical_threshold := 80.0;
         END IF;
     END IF;
 
-    -- CENÁRIO 1: Ruído normal abaixo do limiar de atenção (ex: 40 dB)
     IF NEW.decibel < v_warning_threshold THEN
         RETURN NEW;
     END IF;
 
-    -- Definir severidade da leitura
     IF NEW.decibel >= v_critical_threshold THEN
         v_severity := 'critical';
     ELSE
         v_severity := 'warning';
     END IF;
 
-    -- Verificar se existe um evento ativo recente no mesmo apartamento nos últimos 15 segundos
     SELECT id, peak_db, average_db, duration_seconds, started_at, ended_at, severity
     INTO v_existing_event
     FROM public.noise_events
@@ -159,7 +136,6 @@ BEGIN
     LIMIT 1;
 
     IF FOUND THEN
-        -- Atualizar evento existente (agrupamento e acumulação de métricas)
         v_duration := GREATEST(1, EXTRACT(EPOCH FROM (NEW.recorded_at - v_existing_event.started_at))::INTEGER);
 
         UPDATE public.noise_events
@@ -177,9 +153,7 @@ BEGIN
 
         v_event_id := v_existing_event.id;
 
-        -- CENÁRIO 4: Se o ruído permaneceu acima do limite pelo tempo mínimo estipulado
         IF v_duration >= v_min_duration THEN
-            -- Verificar se já existe alerta recente disparado para este evento ou cooldown
             SELECT EXISTS(
                 SELECT 1 FROM public.alerts
                 WHERE event_id = v_event_id
@@ -209,8 +183,6 @@ BEGIN
         END IF;
 
     ELSE
-        -- CENÁRIO 3: Início de um novo episódio de ruído
-        -- Criar evento inicial com duração de 1 segundo
         INSERT INTO public.noise_events (
             apartment_id,
             device_id,
@@ -237,8 +209,6 @@ BEGIN
             NEW.source
         ) RETURNING id INTO v_event_id;
 
-        -- Se a política exigir duração mínima > 1 segundo, o alerta NÃO é disparado de imediato.
-        -- O alerta só será gerado se o ruído persistir nas leituras subsequentes.
         IF v_min_duration <= 1 THEN
             INSERT INTO public.alerts (
                 apartment_id,
@@ -265,16 +235,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Associar trigger à tabela de leituras (para qualquer fonte: esp32, manual ou simulation)
 DROP TRIGGER IF EXISTS trg_process_noise_reading ON public.noise_readings;
 CREATE TRIGGER trg_process_noise_reading
     AFTER INSERT ON public.noise_readings
     FOR EACH ROW
     EXECUTE FUNCTION public.process_noise_reading();
 
--- ---------------------------------------------------------------------
--- 3. FUNÇÃO PARA LIMPEZA SEGURA DE DADOS DE TESTE / SIMULADOR
--- ---------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.cleanup_test_data()
 RETURNS JSONB AS $$
@@ -283,7 +249,6 @@ DECLARE
     v_deleted_events INTEGER;
     v_deleted_alerts INTEGER;
 BEGIN
-    -- Deletar leituras marcadas como is_test_data
     WITH deleted_r AS (
         DELETE FROM public.noise_readings
         WHERE is_test_data = true
@@ -291,7 +256,6 @@ BEGIN
     )
     SELECT COUNT(*) INTO v_deleted_readings FROM deleted_r;
 
-    -- Deletar eventos gerados por simulação
     WITH deleted_e AS (
         DELETE FROM public.noise_events
         WHERE source = 'simulation'
@@ -299,7 +263,6 @@ BEGIN
     )
     SELECT COUNT(*) INTO v_deleted_events FROM deleted_e;
 
-    -- Deletar alertas órfãos resultantes
     WITH deleted_a AS (
         DELETE FROM public.alerts
         WHERE event_id IS NULL OR event_id NOT IN (SELECT id FROM public.noise_events)

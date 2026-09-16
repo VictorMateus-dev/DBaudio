@@ -1,16 +1,7 @@
-/**
- * ============================================================================
- * dBSound — Arquitetura de Provedor de Cobrança / Billing Provider
- * ============================================================================
- * Esta interface desacopla a regra de negócio de multas da emissão física/bancária.
- * Atualmente implementa o `SimulatedBillingProvider` para protótipos acadêmicos.
- * Futuramente, bastará plugar `AsaasBillingProvider`, `IuguBillingProvider`, etc.
- */
-
 export interface CreateChargeParams {
   amount: number;
   description: string;
-  dueDate: string; // Formato YYYY-MM-DD
+  dueDate: string;
   apartmentNumber: string;
   occurrenceId?: string;
   recipientName?: string;
@@ -19,7 +10,7 @@ export interface CreateChargeParams {
 export interface ChargeResult {
   chargeId: string;
   fineNumber: string;
-  barcode: string; // Linha digitável simulada
+  barcode: string;
   qrCodePix: string;
   amount: number;
   dueDate: string;
@@ -35,10 +26,6 @@ export interface BillingProvider {
   cancelCharge(chargeId: string): Promise<boolean>;
 }
 
-/**
- * Gerador de Linha Digitável e Código de Barras SIMULADO (Fictício)
- * Formato padrão: 34191.XXXXX XXXXX.XXXXXX XXXXX.XXXXXX X XXXXXXXXXXXXXX
- */
 function generateSimulatedBarcode(amount: number, fineNumber: string): string {
   const cleanAmount = Math.round(amount * 100).toString().padStart(10, '0');
   const seed = fineNumber.replace(/\D/g, '').padEnd(8, '7').slice(-8);
@@ -50,16 +37,10 @@ function generateSimulatedBarcode(amount: number, fineNumber: string): string {
   return `${campo1} ${campo2} ${campo3} ${dvGeral} ${campoValor}`;
 }
 
-/**
- * Gerador de Payload PIX Copia e Cola SIMULADO
- */
 function generateSimulatedPixPayload(amount: number, fineNumber: string): string {
   return `00020126580014BR.GOV.BCB.PIX0136dbsound-condominio-simulado-${fineNumber}520400005303986540${amount.toFixed(2)}5802BR5925Condominio dBSound Demo6009Sao Paulo62070503***6304SIMU`;
 }
 
-/**
- * Implementação Padrão: Provedor de Cobrança Simulado
- */
 export class SimulatedBillingProvider implements BillingProvider {
   name = 'simulated';
 
@@ -90,5 +71,4 @@ export class SimulatedBillingProvider implements BillingProvider {
   }
 }
 
-// Instância ativa utilizada pelo sistema
 export const currentBillingProvider: BillingProvider = new SimulatedBillingProvider();

@@ -49,7 +49,6 @@ fun ProfileScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // User Avatar & Name Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -85,7 +84,6 @@ fun ProfileScreen(
                 }
             }
 
-            // Info Details
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -102,7 +100,6 @@ fun ProfileScreen(
                 }
             }
 
-            // Privacy Button
             item {
                 Card(
                     onClick = onNavigateToPrivacy,
@@ -128,7 +125,6 @@ fun ProfileScreen(
                 }
             }
 
-            // Logout Button
             item {
                 OutlinedButton(
                     onClick = onLogout,

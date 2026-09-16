@@ -1,4 +1,3 @@
-/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     "./index.html",
@@ -22,10 +21,10 @@ export default {
           blue: '#3b82f6',
         },
         noise: {
-          normal: '#10b981',    // green
-          warning: '#f59e0b',   // yellow/amber
-          critical: '#ef4444',  // red
-          offline: '#6b7280',   // gray
+          normal: '#10b981',
+          warning: '#f59e0b',
+          critical: '#ef4444',
+          offline: '#6b7280',
         }
       },
       boxShadow: {

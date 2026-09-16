@@ -1,15 +1,7 @@
--- =====================================================================
--- dBSound - Monitoramento Inteligente de Ruído Residencial
--- Migration 01: Initial Schema, Indexes, RLS & Realtime Configuration
--- =====================================================================
 
--- Habilitar extensão para geração de UUID
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ---------------------------------------------------------------------
--- 1. TABELAS ESTRUTURAIS (CONDOMÍNIO, BLOCOS E APARTAMENTOS)
--- ---------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.condominiums (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -34,9 +26,6 @@ CREATE TABLE IF NOT EXISTS public.apartments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ---------------------------------------------------------------------
--- 2. PERFIS DE USUÁRIOS (SÍNDICO / MORADOR)
--- ---------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -54,9 +43,6 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     )
 );
 
--- ---------------------------------------------------------------------
--- 3. DISPOSITIVOS E SENSORES
--- ---------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.devices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -75,16 +61,13 @@ CREATE TABLE IF NOT EXISTS public.sensors (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     device_id UUID NOT NULL REFERENCES public.devices(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    position TEXT NOT NULL, -- Ex: 'Sala', 'Quarto', 'Cozinha'
-    channel INTEGER NOT NULL, -- 1, 2, 3
+    position TEXT NOT NULL, 
+    channel INTEGER NOT NULL, 
     enabled BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT uq_device_channel UNIQUE (device_id, channel)
 );
 
--- ---------------------------------------------------------------------
--- 4. POLÍTICAS DE RUÍDO DO CONDOMÍNIO
--- ---------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.noise_policies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -102,9 +85,6 @@ CREATE TABLE IF NOT EXISTS public.noise_policies (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ---------------------------------------------------------------------
--- 5. LEITURAS DE RUÍDO (TELEMETRIA QUANTITATIVA)
--- ---------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.noise_readings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -118,9 +98,6 @@ CREATE TABLE IF NOT EXISTS public.noise_readings (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ---------------------------------------------------------------------
--- 6. EVENTOS DE RUÍDO (EPISÓDIOS AGREGADOS)
--- ---------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.noise_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -138,9 +115,6 @@ CREATE TABLE IF NOT EXISTS public.noise_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ---------------------------------------------------------------------
--- 7. ALERTAS (NOTIFICAÇÕES AO MORADOR E ADMIN)
--- ---------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.alerts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -155,17 +129,14 @@ CREATE TABLE IF NOT EXISTS public.alerts (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ---------------------------------------------------------------------
--- 8. OCORRÊNCIAS E COMENTÁRIOS (RELATOS MANUAIS DE MORADORES)
--- ---------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.occurrences (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     condominium_id UUID NOT NULL REFERENCES public.condominiums(id) ON DELETE CASCADE,
     reporter_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     apartment_id UUID REFERENCES public.apartments(id) ON DELETE SET NULL,
-    type TEXT NOT NULL, -- Ex: 'Ruído Excessivo', 'Música Alta', 'Reforma fora de horário'
-    location TEXT NOT NULL, -- Ex: 'Apartamento 202', 'Área de Lazer'
+    type TEXT NOT NULL, 
+    location TEXT NOT NULL, 
     description TEXT NOT NULL,
     occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     status TEXT NOT NULL CHECK (status IN ('aberta', 'em análise', 'resolvida', 'cancelada')) DEFAULT 'aberta',
@@ -183,9 +154,6 @@ CREATE TABLE IF NOT EXISTS public.occurrence_comments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ---------------------------------------------------------------------
--- 9. ÍNDICES DE ALTA PERFORMANCE
--- ---------------------------------------------------------------------
 
 CREATE INDEX IF NOT EXISTS idx_apartments_building ON public.apartments(building_id);
 CREATE INDEX IF NOT EXISTS idx_buildings_condominium ON public.buildings(condominium_id);
@@ -209,9 +177,6 @@ CREATE INDEX IF NOT EXISTS idx_occurrences_condo ON public.occurrences(condomini
 CREATE INDEX IF NOT EXISTS idx_occurrences_reporter ON public.occurrences(reporter_id);
 CREATE INDEX IF NOT EXISTS idx_occurrences_created_at ON public.occurrences(created_at DESC);
 
--- ---------------------------------------------------------------------
--- 10. HELPER FUNCTIONS PARA AUTENTICAÇÃO E RLS
--- ---------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.current_user_role()
 RETURNS TEXT AS $$
@@ -228,9 +193,6 @@ RETURNS UUID AS $$
     SELECT condominium_id FROM public.profiles WHERE id = auth.uid();
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 
--- ---------------------------------------------------------------------
--- 11. ROW LEVEL SECURITY (RLS) ESTREITO
--- ---------------------------------------------------------------------
 
 ALTER TABLE public.condominiums ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.buildings ENABLE ROW LEVEL SECURITY;
@@ -245,15 +207,12 @@ ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.occurrences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.occurrence_comments ENABLE ROW LEVEL SECURITY;
 
--- Condominiums:
 CREATE POLICY "Admins e moradores veem seu condomínio" ON public.condominiums
     FOR SELECT USING (id = public.current_user_condominium_id());
 
--- Buildings:
 CREATE POLICY "Admins e moradores veem blocos do condomínio" ON public.buildings
     FOR SELECT USING (condominium_id = public.current_user_condominium_id());
 
--- Apartments:
 CREATE POLICY "Admins veem todos os apartamentos do condomínio" ON public.apartments
     FOR SELECT USING (
         public.current_user_role() = 'admin' AND
@@ -266,7 +225,6 @@ CREATE POLICY "Moradores veem apenas seu próprio apartamento" ON public.apartme
         id = public.current_user_apartment_id()
     );
 
--- Profiles:
 CREATE POLICY "Usuário vê seu próprio perfil" ON public.profiles
     FOR SELECT USING (id = auth.uid());
 
@@ -279,7 +237,6 @@ CREATE POLICY "Admin vê perfis do condomínio" ON public.profiles
 CREATE POLICY "Usuário atualiza seu próprio perfil" ON public.profiles
     FOR UPDATE USING (id = auth.uid());
 
--- Devices:
 CREATE POLICY "Admins veem todos os dispositivos do condomínio" ON public.devices
     FOR SELECT USING (
         public.current_user_role() = 'admin' AND
@@ -296,7 +253,6 @@ CREATE POLICY "Moradores veem dispositivos do seu apartamento" ON public.devices
         apartment_id = public.current_user_apartment_id()
     );
 
--- Sensors:
 CREATE POLICY "Admins veem todos os sensores do condomínio" ON public.sensors
     FOR SELECT USING (
         public.current_user_role() = 'admin' AND
@@ -314,7 +270,6 @@ CREATE POLICY "Moradores veem sensores do seu dispositivo" ON public.sensors
         device_id IN (SELECT id FROM public.devices WHERE apartment_id = public.current_user_apartment_id())
     );
 
--- Noise Policies:
 CREATE POLICY "Admins e moradores leem políticas do condomínio" ON public.noise_policies
     FOR SELECT USING (condominium_id = public.current_user_condominium_id());
 
@@ -324,7 +279,6 @@ CREATE POLICY "Apenas admin gerencia políticas do condomínio" ON public.noise_
         condominium_id = public.current_user_condominium_id()
     );
 
--- Noise Readings:
 CREATE POLICY "Moradores veem leituras apenas do seu apartamento" ON public.noise_readings
     FOR SELECT USING (
         public.current_user_role() = 'resident' AND
@@ -343,17 +297,14 @@ CREATE POLICY "Admins veem todas as leituras do condomínio" ON public.noise_rea
 
 CREATE POLICY "Permitir inserção de leituras autorizadas" ON public.noise_readings
     FOR INSERT WITH CHECK (
-        -- Morador pode inserir para seu próprio apartamento (ex: teste/simulação)
         (public.current_user_role() = 'resident' AND apartment_id = public.current_user_apartment_id())
         OR
-        -- Admin pode inserir para qualquer apto do condomínio (ex: simulador/painel)
         (public.current_user_role() = 'admin' AND apartment_id IN (
             SELECT a.id FROM public.apartments a
             JOIN public.buildings b ON a.building_id = b.id
             WHERE b.condominium_id = public.current_user_condominium_id()
         ))
         OR
-        -- Dispositivo ESP32 autenticado via RPC (executada com SECURITY DEFINER)
         auth.uid() IS NULL
     );
 
@@ -368,7 +319,6 @@ CREATE POLICY "Admin pode deletar leituras de teste" ON public.noise_readings
         )
     );
 
--- Noise Events:
 CREATE POLICY "Moradores veem eventos apenas do seu apartamento" ON public.noise_events
     FOR SELECT USING (
         public.current_user_role() = 'resident' AND
@@ -392,7 +342,6 @@ CREATE POLICY "Permitir atualizar acknowledged no evento" ON public.noise_events
         (public.current_user_role() = 'admin')
     );
 
--- Alerts:
 CREATE POLICY "Moradores veem seus alertas" ON public.alerts
     FOR SELECT USING (
         public.current_user_role() = 'resident' AND
@@ -415,7 +364,6 @@ CREATE POLICY "Moradores marcam alerta como lido" ON public.alerts
         apartment_id = public.current_user_apartment_id()
     );
 
--- Occurrences:
 CREATE POLICY "Morador vê suas ocorrências criadas" ON public.occurrences
     FOR SELECT USING (
         public.current_user_role() = 'resident' AND
@@ -441,7 +389,6 @@ CREATE POLICY "Admin atualiza status de ocorrência" ON public.occurrences
         condominium_id = public.current_user_condominium_id()
     );
 
--- Occurrence Comments:
 CREATE POLICY "Visualizar comentários de ocorrência permitida" ON public.occurrence_comments
     FOR SELECT USING (
         occurrence_id IN (
@@ -464,9 +411,6 @@ CREATE POLICY "Adicionar comentário em ocorrência" ON public.occurrence_commen
         )
     );
 
--- ---------------------------------------------------------------------
--- 12. SUPABASE REALTIME REPLICATION
--- ---------------------------------------------------------------------
 
 DO $$
 BEGIN

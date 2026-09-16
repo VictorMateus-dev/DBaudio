@@ -5,7 +5,7 @@ data class UserProfile(
     val fullName: String,
     val email: String,
     val phone: String?,
-    val role: String, // "resident", "admin"
+    val role: String, 
     val condominiumId: String,
     val apartmentId: String?,
     val apartmentNumber: String = "101"
@@ -15,7 +15,7 @@ data class NoiseTelemetry(
     val currentDb: Float,
     val peakDb: Float,
     val averageDb: Float,
-    val status: String, // "normal", "warning", "critical", "offline"
+    val status: String, 
     val isDeviceOnline: Boolean,
     val lastRecordedAt: String
 )
@@ -26,7 +26,7 @@ data class NoiseEventItem(
     val averageDb: Float,
     val durationSeconds: Int,
     val startedAt: String,
-    val severity: String, // "normal", "warning", "critical"
+    val severity: String, 
     val sensorPosition: String = "Sala"
 )
 
@@ -34,7 +34,7 @@ data class AlertNotification(
     val id: String,
     val title: String,
     val message: String,
-    val severity: String, // "warning", "critical"
+    val severity: String, 
     val decibel: Float,
     val isRead: Boolean,
     val createdAt: String
@@ -46,8 +46,8 @@ data class OccurrenceItem(
     val location: String,
     val description: String,
     val occurredAt: String,
-    val status: String, // "aberta", "em análise", "resolvida", "cancelada"
-    val priority: String, // "baixa", "media", "alta"
+    val status: String, 
+    val priority: String, 
     val isAnonymous: Boolean,
     val reporterName: String?
 )

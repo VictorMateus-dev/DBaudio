@@ -1,6 +1,3 @@
--- =====================================================================
--- dBSound: Migração 008 — Conversas, Chat Bidirecional e Chat Preventivo
--- =====================================================================
 
 CREATE TABLE IF NOT EXISTS public.conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

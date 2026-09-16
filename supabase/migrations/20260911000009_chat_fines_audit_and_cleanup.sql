@@ -1,19 +1,10 @@
--- =====================================================================
--- dBSound: Migração 009 — Auditoria de Chat, Conversas e Cancelamento de Multas
--- =====================================================================
-
--- 1. Adiciona coluna sender_role em conversation_messages se não existir
 ALTER TABLE public.conversation_messages
     ADD COLUMN IF NOT EXISTS sender_role TEXT NOT NULL DEFAULT 'syndic' CHECK (sender_role IN ('syndic', 'resident'));
-
--- 2. Adiciona colunas de auditoria de cancelamento em fines se não existirem
 ALTER TABLE public.fines
     ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS cancelled_by TEXT,
     ADD COLUMN IF NOT EXISTS cancellation_reason TEXT,
     ADD COLUMN IF NOT EXISTS previous_status TEXT;
-
--- 3. Atualiza restrição de status em fines para garantir 'cancelada'
 DO $$ 
 BEGIN
     ALTER TABLE public.fines DROP CONSTRAINT IF EXISTS fines_status_check;
@@ -22,13 +13,9 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN NULL;
 END $$;
-
--- 4. Índices para performance
 CREATE INDEX IF NOT EXISTS idx_conv_messages_role ON public.conversation_messages(sender_role);
 CREATE INDEX IF NOT EXISTS idx_fines_status ON public.fines(status);
 CREATE INDEX IF NOT EXISTS idx_fines_apartment ON public.fines(apartment_id);
-
--- 5. RLS Policies para conversation_messages e conversations com isolamento
 DROP POLICY IF EXISTS "Permitir leitura de conversas" ON public.conversations;
 DROP POLICY IF EXISTS "Permitir insercao de conversas" ON public.conversations;
 DROP POLICY IF EXISTS "Permitir atualizacao de conversas" ON public.conversations;

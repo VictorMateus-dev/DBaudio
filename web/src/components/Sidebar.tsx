@@ -51,7 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className="w-full lg:w-[260px] h-full shrink-0 bg-space-900/95 backdrop-blur-xl border-r border-white/5 flex flex-col justify-between z-10 select-none">
       <div>
-        {/* Vaultflow Logo & Brand */}
+        
         <div className="p-6 border-b border-white/5 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center text-white shadow-glow-purple">
@@ -77,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Navigation Items */}
+        
         <nav className="p-3.5 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -112,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </div>
 
-      {/* Footer / User Profile & Role Switcher */}
+      
       <div className="p-4 border-t border-white/5 bg-space-950/60">
         <div className="vault-card rounded-2xl p-3 border-white/10 mb-3 space-y-2.5">
           <div className="flex items-center justify-between">
@@ -137,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          {/* Preview Morador Toggle */}
+          
           <div className="pt-1">
             <button
               type="button"

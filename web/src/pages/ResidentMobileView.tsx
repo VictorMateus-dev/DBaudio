@@ -56,7 +56,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
   const [isPhoneFrame, setIsPhoneFrame] = useState<boolean>(true);
 
-  // Central de Mensagens do Morador
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const selectedConversationRef = React.useRef<Conversation | null>(null);
@@ -69,7 +68,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
 
-  // Form states para nova ocorrência
   const [newType, setNewType] = useState('Música Alta / Som Excessivo');
   const [targetAptId, setTargetAptId] = useState<string>('');
   const [newLocation, setNewLocation] = useState('Apartamento 202');
@@ -78,7 +76,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   const [createdSuccess, setCreatedSuccess] = useState(false);
   const [isSubmittingOcc, setIsSubmittingOcc] = useState(false);
 
-  // Dados carregados dinamicamente
   const [availableApartments, setAvailableApartments] = useState<Apartment[]>([]);
   const [unitFines, setUnitFines] = useState<SimulatedFine[]>([]);
   const [allOccurrencesList, setAllOccurrencesList] = useState<Occurrence[]>(occurrences);
@@ -86,7 +83,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   const [copiedBarcode, setCopiedBarcode] = useState(false);
   const [copiedPix, setCopiedPix] = useState(false);
 
-  // Unidade efetiva: caso apartment seja nulo, sintetiza com base nos dados do usuário alocado
   const effectiveApt: Apartment = apartment || {
     id: user?.apartment_id || 'unassigned',
     building_id: '00000000-0000-0000-0000-000000000002',
@@ -102,7 +98,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
     created_at: user?.created_at || new Date().toISOString(),
   };
 
-  // Carrega lista de apartamentos, multas da unidade e ocorrências atualizadas
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -232,7 +227,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
     await handleOpenConversation(conv);
   };
 
-  // Detecta alerta crítico recente não lido estritamente desta unidade e abre modal automaticamente
   useEffect(() => {
     const unreadCritical = alerts.find(a => 
       a.apartment_id === effectiveApt.id && 
@@ -309,14 +303,13 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
     setTimeout(() => setCopiedPix(false), 2000);
   };
 
-  // TELA DE ESPERA: Quando o morador confirmou e-mail mas ainda não foi alocado a um apartamento
   if (!user?.apartment_id || user?.status === 'pending') {
     return (
       <div className="min-h-screen bg-space-950 p-4 md:p-8 flex flex-col items-center justify-center relative overflow-hidden">
-        {/* Atmospheric Glow */}
+        
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[500px] bg-violet-600/15 blur-[120px] pointer-events-none" />
 
-        {/* Top Bar */}
+        
         <div className="w-full max-w-md mb-4 flex items-center justify-between text-xs text-slate-400 px-2 relative z-10">
           <div className="flex items-center space-x-2">
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
@@ -332,7 +325,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
           </button>
         </div>
 
-        {/* Pending Card in Vaultflow Style */}
+        
         <div className="w-full max-w-md vault-card rounded-3xl p-8 text-center space-y-6 shadow-glass-card relative z-10 animate-fadeIn">
           <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-500/20 to-violet-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto shadow-glow-purple">
             <Building2 className="w-8 h-8" />
@@ -388,7 +381,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
 
   return (
     <div className="min-h-screen bg-space-950 p-4 md:p-8 flex flex-col items-center justify-center">
-      {/* Top Banner with View Switcher */}
+      
       <div className="w-full max-w-md mb-4 flex items-center justify-between text-xs text-slate-400 px-2">
         <div className="flex items-center space-x-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -404,7 +397,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
             <span>{isPhoneFrame ? 'Expandir' : 'Moldura'}</span>
           </button>
 
-          {/* Botão de retorno visível APENAS para administradores em modo teste */}
+          
           {user?.role === 'admin' && (
             <button
               onClick={() => switchRole('admin')}
@@ -424,19 +417,19 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
         </div>
       </div>
 
-      {/* Smartphone Container */}
+      
       <div className={`w-full max-w-md bg-slate-900 border ${
         isPhoneFrame ? 'border-slate-800 rounded-[36px] shadow-2xl p-4 ring-8 ring-slate-950' : 'border-transparent rounded-2xl p-2'
       } relative overflow-hidden flex flex-col min-h-[720px]`}>
         
-        {/* Smartphone Speaker Notch */}
+        
         {isPhoneFrame && (
           <div className="w-24 h-4 bg-slate-950 rounded-full mx-auto mb-3 flex items-center justify-center">
             <div className="w-8 h-1 bg-slate-800 rounded-full"></div>
           </div>
         )}
 
-        {/* App Top Bar */}
+        
         <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-4 px-2">
           <div>
             <h2 className="text-base font-bold text-white tracking-tight">Olá, {user?.full_name || 'Morador'}</h2>
@@ -449,11 +442,11 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
           </div>
         </div>
 
-        {/* Content Screens */}
+        
         <div className="flex-1 overflow-y-auto px-1 pb-16 space-y-4">
           {activeTab === 'home' && (
             <div className="space-y-4">
-              {/* Circular Gauge Card */}
+              
               <div className={`p-6 rounded-2xl border text-center transition-all ${
                 status === 'critical'
                   ? 'bg-red-950/20 border-red-500 critical-pulse'
@@ -485,7 +478,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                 </div>
               </div>
 
-              {/* 24h Metrics Cards */}
+              
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-xs">
                   <span className="text-slate-400 block mb-1">Média 24h</span>
@@ -497,7 +490,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                 </div>
               </div>
 
-              {/* Quick Button: Criar Ocorrência */}
+              
               <button
                 onClick={() => setActiveTab('occurrences')}
                 className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center space-x-2 shadow-md transition"
@@ -506,7 +499,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                 <span>Registrar Nova Ocorrência</span>
               </button>
 
-              {/* Recent Alerts List */}
+              
               <div className="space-y-2 pt-2">
                 <span className="text-xs font-bold text-slate-300 block">Alertas Recentes da Unidade</span>
                 {unitAlerts.length === 0 ? (
@@ -565,9 +558,8 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
           {activeTab === 'messages' && (
             <div className="space-y-3 text-xs flex flex-col h-full animate-fadeIn">
               {selectedConversation ? (
-                /* CHAT VIEW BIDIRECIONAL COM O SÍNDICO */
                 <div className="flex flex-col space-y-3">
-                  {/* Top Bar of Chat */}
+                  
                   <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                     <button
                       type="button"
@@ -591,7 +583,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                     <p className="text-[10px] text-slate-400">Canal com a Administração • Condomínio Inteligente</p>
                   </div>
 
-                  {/* Clarification Callout */}
+                  
                   <div className={`p-2.5 rounded-xl text-[10px] leading-relaxed ${
                     selectedConversation.type === 'preventivo'
                       ? 'bg-amber-950/20 border border-amber-500/20 text-amber-300'
@@ -602,7 +594,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                       : '⚖️ Comunicação direta referente à ocorrência registrada. O anonimato do denunciante permanece 100% protegido.'}
                   </div>
 
-                  {/* Messages Stream */}
+                  
                   <div className="space-y-2.5 max-h-[300px] overflow-y-auto p-2.5 bg-slate-950/70 border border-slate-800 rounded-2xl">
                     {activeMessages.length === 0 ? (
                       <p className="text-center py-6 text-slate-500 text-[11px]">Nenhuma mensagem nesta conversa.</p>
@@ -635,7 +627,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                     )}
                   </div>
 
-                  {/* Reply Form */}
+                  
                   <form onSubmit={handleSendResidentReply} className="flex gap-2 pt-1">
                     <input
                       type="text"
@@ -655,7 +647,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                   </form>
                 </div>
               ) : (
-                /* CONVERSATIONS LIST (CENTRAL DE MENSAGENS) */
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -729,7 +720,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
 
           {activeTab === 'occurrences' && (
             <div className="space-y-3 text-xs">
-              {/* Sub-tabs de Ocorrências */}
+              
               <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800">
                 <button
                   type="button"
@@ -771,7 +762,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                 </button>
               </div>
 
-              {/* Subaba 1: Nova Denúncia */}
+              
               {occSubTab === 'new' && (
                 <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
@@ -810,7 +801,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                       </select>
                     </div>
 
-                    {/* Telemetria Acústica do Alvo */}
+                    
                     {(() => {
                       const targetApt = availableApartments.find(a => a.id === targetAptId);
                       if (!targetApt) return null;
@@ -858,7 +849,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                       />
                     </div>
 
-                    {/* Card de Denúncia Anônima */}
+                    
                     <div 
                       onClick={() => setIsAnonymous(!isAnonymous)}
                       className={`p-3 rounded-xl border transition cursor-pointer ${
@@ -906,10 +897,10 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                 </div>
               )}
 
-              {/* Subaba 2: Notificações & Multas da Minha Unidade */}
+              
               {occSubTab === 'notices' && (
                 <div className="space-y-3">
-                  {/* Multas Fictícias da Unidade */}
+                  
                   {unitFines.length > 0 && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs">
@@ -998,7 +989,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                     </div>
                   )}
 
-                  {/* Advertências e Notificações Administrativas */}
+                  
                   {(() => {
                     const unitNotices = allOccurrencesList.filter(
                       o => o.apartment_id === effectiveApt.id && 
@@ -1042,7 +1033,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                               </span>
                             </div>
 
-                            {/* Detalhes sem exibir o denunciante (garantia de anonimato absoluto) */}
+                            
                             <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800/80 text-[11px] space-y-1">
                               <span className="text-violet-400 font-semibold block mb-0.5">Parecer da Administração:</span>
                               <p className="text-slate-300">
@@ -1075,7 +1066,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                 </div>
               )}
 
-              {/* Subaba 3: Minhas Denúncias Enviadas */}
+              
               {occSubTab === 'my_reports' && (
                 <div className="space-y-3">
                   <span className="text-xs font-bold text-white block">Histórico de Relatos Enviados por Você</span>
@@ -1221,7 +1212,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
           )}
         </div>
 
-        {/* Bottom Navigation Bar */}
+        
         <div className="absolute bottom-0 left-0 right-0 h-14 bg-slate-950 border-t border-slate-800/80 flex items-center justify-around px-2 z-20">
           <button
             onClick={() => setActiveTab('home')}
@@ -1281,7 +1272,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
           </button>
         </div>
 
-        {/* Modal de Visualização de Documento de Cobrança / Boleto SIMULADO */}
+        
         {selectedFineForModal && (
           <PrintableBoleto
             fine={selectedFineForModal}
@@ -1289,7 +1280,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
           />
         )}
 
-        {/* Modal de Alerta Crítico (Exato Requisito 23) */}
+        
         {activeModalAlert && (
           <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-slate-900 border-2 border-red-500 rounded-3xl p-6 text-center space-y-4 shadow-2xl max-w-xs w-full">

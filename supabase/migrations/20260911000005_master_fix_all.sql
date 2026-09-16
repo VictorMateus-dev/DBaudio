@@ -1,14 +1,5 @@
--- =====================================================================
--- dBSound: Migration 005 — Master Fix All (Alocação, Criação e Permissões)
--- Resolve definitivamente permissões de RLS, Foreign Keys, UUIDs,
--- criação de apartamentos e alocação de moradores no Supabase
--- =====================================================================
-
--- 1. EXTENSÕES
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
--- 2. GARANTIR ESTRUTURA BASE (CONDOMÍNIO E BLOCO PADRÃO COM UUIDS FIXOS)
 INSERT INTO public.condominiums (id, name, address, created_at, updated_at)
 VALUES (
     '00000000-0000-0000-0000-000000000001'::UUID,
@@ -27,14 +18,10 @@ VALUES (
     now()
 )
 ON CONFLICT (id) DO NOTHING;
-
--- 3. GARANTIR COLUNAS DE LIMITES CUSTOMIZADOS NA TABELA APARTMENTS
 ALTER TABLE public.apartments 
     ADD COLUMN IF NOT EXISTS custom_day_threshold_db NUMERIC DEFAULT 70.0,
     ADD COLUMN IF NOT EXISTS custom_night_threshold_db NUMERIC DEFAULT 60.0,
     ADD COLUMN IF NOT EXISTS custom_critical_threshold_db NUMERIC DEFAULT 80.0;
-
--- 4. FLEXIBILIZAR RESTRIÇÕES DE MORADORES
 ALTER TABLE public.profiles 
     DROP CONSTRAINT IF EXISTS chk_resident_apartment;
 
@@ -45,8 +32,6 @@ ALTER TABLE public.profiles
     ADD CONSTRAINT chk_resident_apartment_flexible CHECK (
         role IN ('resident', 'admin')
     );
-
--- 5. TRIGGER INTELIGENTE DE NOVO USUÁRIO (AUTO-DETECÇÃO DE SÍNDICO / MORADOR)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -54,13 +39,10 @@ DECLARE
     user_role TEXT := 'resident';
     user_count INT;
 BEGIN
-    -- Busca condomínio existente ou usa o padrão
     SELECT id INTO default_condo_id FROM public.condominiums ORDER BY created_at ASC LIMIT 1;
     IF default_condo_id IS NULL THEN
         default_condo_id := '00000000-0000-0000-0000-000000000001'::UUID;
     END IF;
-
-    -- Se o e-mail contém 'admin' ou se for o primeiro usuário cadastrado, torna-se admin
     SELECT count(*) INTO user_count FROM public.profiles;
     IF NEW.email ILIKE '%admin%' OR user_count = 0 OR (NEW.raw_user_meta_data->>'role') = 'admin' THEN
         user_role := 'admin';
@@ -101,8 +83,6 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- 6. RPC: ALOCAR MORADOR AO APARTAMENTO (SECURITY DEFINER)
 CREATE OR REPLACE FUNCTION public.assign_resident_to_apartment(
     p_profile_id UUID,
     p_apartment_id UUID
@@ -113,7 +93,6 @@ DECLARE
 BEGIN
     SELECT number INTO v_apt_number FROM public.apartments WHERE id = p_apartment_id;
     IF v_apt_number IS NULL THEN
-        -- Auto-provisiona apartamento se ele tiver sido gerado localmente
         INSERT INTO public.apartments (id, building_id, number, floor, custom_day_threshold_db, custom_night_threshold_db, custom_critical_threshold_db)
         VALUES (p_apartment_id, '00000000-0000-0000-0000-000000000002'::UUID, 'Unidade', 1, 70, 60, 80)
         ON CONFLICT (id) DO NOTHING;
@@ -141,8 +120,6 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 7. RPC: DESVINCULAR MORADOR DO APARTAMENTO
 CREATE OR REPLACE FUNCTION public.unassign_resident_from_apartment(
     p_profile_id UUID
 )
@@ -159,8 +136,6 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 8. RPC: CRIAR APARTAMENTO (COM OU SEM ALOCAÇÃO DE MORADOR)
 CREATE OR REPLACE FUNCTION public.create_apartment_and_assign(
     p_number TEXT,
     p_floor INT DEFAULT 1,
@@ -174,7 +149,6 @@ DECLARE
     v_building_id UUID;
     v_new_apt RECORD;
 BEGIN
-    -- Obter bloco existente ou o padrão
     SELECT id INTO v_building_id FROM public.buildings ORDER BY created_at ASC LIMIT 1;
     IF v_building_id IS NULL THEN
         INSERT INTO public.condominiums (id, name, address)
@@ -187,8 +161,6 @@ BEGIN
 
         v_building_id := '00000000-0000-0000-0000-000000000002'::UUID;
     END IF;
-
-    -- Se o apartamento já existir com este número, reaproveita e atualiza limites
     SELECT * INTO v_new_apt FROM public.apartments WHERE number = p_number LIMIT 1;
     IF v_new_apt IS NOT NULL THEN
         UPDATE public.apartments
@@ -237,8 +209,6 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 8.1 RPC: LIMPAR DADOS MOCKADOS
 CREATE OR REPLACE FUNCTION public.clear_mock_apartments()
 RETURNS JSONB AS $$
 BEGIN
@@ -254,8 +224,6 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 9. RPC: RECUPERAR OU CRIAR PERFIL
 CREATE OR REPLACE FUNCTION public.get_or_create_profile(
     p_user_id UUID,
     p_email TEXT,
@@ -318,9 +286,6 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 10. RECONFIGURAÇÃO TOTAL DE POLÍTICAS RLS (ELIMINA ERROS 42501 DE PERMISSÃO)
--- Apartamentos: Leitura, Inserção, Atualização e Deleção permitidas
 DROP POLICY IF EXISTS "Admin gerencia apartamentos" ON public.apartments;
 DROP POLICY IF EXISTS "Admins veem todos os apartamentos do condomínio" ON public.apartments;
 DROP POLICY IF EXISTS "Moradores veem apenas seu próprio apartamento" ON public.apartments;
@@ -341,8 +306,6 @@ CREATE POLICY "Permitir edicao de apartamentos" ON public.apartments
 
 CREATE POLICY "Permitir remocao de apartamentos" ON public.apartments
     FOR DELETE USING (true);
-
--- Perfis: Leitura e Atualização permitidas para todos os usuários autenticados
 DROP POLICY IF EXISTS "Admin atualiza moradores do condomínio" ON public.profiles;
 DROP POLICY IF EXISTS "Admin remove moradores do condomínio" ON public.profiles;
 DROP POLICY IF EXISTS "Admin vê perfis do condomínio" ON public.profiles;
@@ -361,8 +324,6 @@ CREATE POLICY "Permitir atualizacao de perfis" ON public.profiles
 
 CREATE POLICY "Permitir remocao de perfis" ON public.profiles
     FOR DELETE USING (true);
-
--- Condomínios e Blocos:
 DROP POLICY IF EXISTS "Permitir leitura de condominios" ON public.condominiums;
 DROP POLICY IF EXISTS "Permitir leitura de blocos" ON public.buildings;
 DROP POLICY IF EXISTS "Admins e moradores veem seu condomínio" ON public.condominiums;
@@ -372,8 +333,6 @@ CREATE POLICY "Permitir leitura de condominios" ON public.condominiums
     FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir leitura de blocos" ON public.buildings
     FOR ALL USING (true) WITH CHECK (true);
-
--- 11. GRANT DE EXECUÇÃO TOTAL PARA ROLES ANÔNIMO E AUTENTICADO
 GRANT ALL ON public.apartments TO anon, authenticated, service_role;
 GRANT ALL ON public.profiles TO anon, authenticated, service_role;
 GRANT ALL ON public.buildings TO anon, authenticated, service_role;

@@ -1,8 +1,3 @@
--- =====================================================================
--- dBSound - Monitoramento Inteligente de Ruído Residencial
--- Seed Data: Condomínio de Demonstração, Apartamentos 101-303,
--- Dispositivos ESP32, Sensores, Políticas e Usuários de Teste
--- =====================================================================
 
 DO $$
 DECLARE
@@ -36,17 +31,14 @@ DECLARE
     v_occ_id UUID := 'e1e2e3e4-0000-0000-0000-000000000001';
     v_sensor_101_sala UUID;
 BEGIN
-    -- 1. CONDOMÍNIO
     INSERT INTO public.condominiums (id, name, address)
     VALUES (v_condo_id, 'Residencial dBSound', 'Av. das Nações Inteligentes, 1000 - São Paulo, SP')
     ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, address = EXCLUDED.address;
 
-    -- 2. BLOCO
     INSERT INTO public.buildings (id, condominium_id, name)
     VALUES (v_building_id, v_condo_id, 'Bloco A')
     ON CONFLICT (id) DO NOTHING;
 
-    -- 3. APARTAMENTOS (101 a 303)
     INSERT INTO public.apartments (id, building_id, number, floor) VALUES
         (v_apt_101, v_building_id, '101', 1),
         (v_apt_102, v_building_id, '102', 1),
@@ -59,7 +51,6 @@ BEGIN
         (v_apt_303, v_building_id, '303', 3)
     ON CONFLICT (id) DO NOTHING;
 
-    -- 4. POLÍTICAS DE RUÍDO (DIURNA: 70 dB / NOTURNA: 60 dB)
     DELETE FROM public.noise_policies WHERE condominium_id = v_condo_id;
 
     INSERT INTO public.noise_policies (
@@ -68,8 +59,6 @@ BEGIN
         (v_condo_id, 'Política Diurna', '07:00:00'::TIME, '22:00:00'::TIME, 70.0, 70.0, 80.0, 3, 60, true),
         (v_condo_id, 'Política Noturna (Lei do Silêncio)', '22:00:00'::TIME, '07:00:00'::TIME, 60.0, 60.0, 70.0, 3, 60, true);
 
-    -- 5. USUÁRIOS FICTÍCIOS NO AUTH.USERS (PARA AMBIENTES ONDE AUTONOMIA É TOTAL)
-    -- Em ambiente Supabase gerenciado, o Auth cria na tabela auth.users; aqui garantimos coerência relacional.
     BEGIN
         INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role)
         VALUES 
@@ -80,10 +69,9 @@ BEGIN
         ON CONFLICT (id) DO NOTHING;
     EXCEPTION
         WHEN undefined_table THEN
-            NULL; -- Caso auth.users não seja acessível diretamente sem privilégios de superuser
+            NULL; 
     END;
 
-    -- 6. PERFIS DOS USUÁRIOS
     INSERT INTO public.profiles (id, full_name, email, phone, role, condominium_id, apartment_id) VALUES
         (v_admin_id, 'Carlos Síndico Geral', 'admin@dbsound.com', '(11) 98888-0001', 'admin', v_condo_id, NULL),
         (v_morador_101, 'João Silva', 'morador101@dbsound.com', '(11) 97777-0101', 'resident', v_condo_id, v_apt_101),
@@ -91,7 +79,6 @@ BEGIN
         (v_morador_202, 'Lucas Souza', 'morador202@dbsound.com', '(11) 97777-0202', 'resident', v_condo_id, v_apt_202)
     ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role;
 
-    -- 7. DISPOSITIVOS ESP32 (COM TOKENS EXCLUSIVOS DE CADA DISPOSITIVO)
     INSERT INTO public.devices (id, apartment_id, device_uid, name, status, firmware_version, secret_token, last_seen_at) VALUES
         (v_dev_101, v_apt_101, 'ESP32-APT-101', 'Unidade Central Apto 101', 'online', '1.2.0', 'dbsound_token_101_secure', now()),
         (v_dev_102, v_apt_102, 'ESP32-APT-102', 'Unidade Central Apto 102', 'online', '1.2.0', 'dbsound_token_102_secure', now()),
@@ -104,26 +91,21 @@ BEGIN
         (v_dev_303, v_apt_303, 'ESP32-APT-303', 'Unidade Central Apto 303', 'maintenance', '1.0.0', 'dbsound_token_303_secure', now() - INTERVAL '1 day')
     ON CONFLICT (id) DO NOTHING;
 
-    -- 8. SENSORES (3 SENSORES POR DISPOSITIVO: SALA, QUARTO, COZINHA)
     DELETE FROM public.sensors WHERE device_id IN (v_dev_101, v_dev_102, v_dev_103, v_dev_201, v_dev_202, v_dev_203, v_dev_301, v_dev_302, v_dev_303);
 
     INSERT INTO public.sensors (device_id, name, position, channel, enabled) VALUES
-        -- Apto 101
         (v_dev_101, 'MAX9814 - Sala Principal', 'Sala', 1, true),
         (v_dev_101, 'MAX9814 - Quarto Casal', 'Quarto', 2, true),
         (v_dev_101, 'MAX9814 - Cozinha/Área', 'Cozinha', 3, true),
-        -- Apto 102
         (v_dev_102, 'MAX9814 - Sala', 'Sala', 1, true),
         (v_dev_102, 'MAX9814 - Quarto', 'Quarto', 2, true),
         (v_dev_102, 'MAX9814 - Cozinha', 'Cozinha', 3, true),
-        -- Apto 202
         (v_dev_202, 'MAX9814 - Sala', 'Sala', 1, true),
         (v_dev_202, 'MAX9814 - Quarto', 'Quarto', 2, true),
         (v_dev_202, 'MAX9814 - Cozinha', 'Cozinha', 3, true);
 
     SELECT id INTO v_sensor_101_sala FROM public.sensors WHERE device_id = v_dev_101 AND channel = 1 LIMIT 1;
 
-    -- 9. LEITURAS INICIAIS DE TELEMETRIA (BASELINE NORMAL: 42 A 52 dB)
     INSERT INTO public.noise_readings (device_id, sensor_id, apartment_id, decibel, source, is_test_data, recorded_at) VALUES
         (v_dev_101, v_sensor_101_sala, v_apt_101, 45.2, 'esp32', false, now() - INTERVAL '50 minutes'),
         (v_dev_101, v_sensor_101_sala, v_apt_101, 48.0, 'esp32', false, now() - INTERVAL '40 minutes'),
@@ -132,7 +114,6 @@ BEGIN
         (v_dev_101, v_sensor_101_sala, v_apt_101, 49.5, 'esp32', false, now() - INTERVAL '10 minutes'),
         (v_dev_101, v_sensor_101_sala, v_apt_101, 44.8, 'esp32', false, now());
 
-    -- 10. OCORRÊNCIA DEMONSTRATIVA
     INSERT INTO public.occurrences (
         id, condominium_id, reporter_id, apartment_id, type, location, description, occurred_at, status, priority, anonymous
     ) VALUES (

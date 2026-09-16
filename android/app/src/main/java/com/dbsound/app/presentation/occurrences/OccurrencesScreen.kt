@@ -28,10 +28,9 @@ fun OccurrencesScreen(
     onAddComment: (occurrenceId: String, comment: String) -> Unit,
     commentsMap: Map<String, List<OccurrenceCommentItem>>
 ) {
-    var selectedTab by remember { mutableStateOf(0) } // 0 = Minhas Ocorrências, 1 = Nova Ocorrência
+    var selectedTab by remember { mutableStateOf(0) } 
     var selectedOccurrenceForDetails by remember { mutableStateOf<OccurrenceItem?>(null) }
 
-    // Form states
     var type by remember { mutableStateOf("Música Alta / Som Excessivo") }
     var location by remember { mutableStateOf("Apartamento 202") }
     var description by remember { mutableStateOf("") }
@@ -61,7 +60,6 @@ fun OccurrencesScreen(
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
-            // Tab Selector
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = DarkSlateCard,
@@ -83,7 +81,6 @@ fun OccurrencesScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (selectedTab == 0) {
-                // List of Occurrences
                 if (occurrences.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("Você não possui ocorrências registradas.", color = Color(0xFF64748B), fontSize = 13.sp)
@@ -147,7 +144,6 @@ fun OccurrencesScreen(
                     }
                 }
             } else {
-                // New Occurrence Form
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -215,7 +211,6 @@ fun OccurrencesScreen(
                         }
                     }
 
-                    // Mandatory Privacy Notice
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),

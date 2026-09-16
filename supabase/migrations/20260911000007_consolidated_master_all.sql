@@ -1,15 +1,6 @@
--- =====================================================================
--- dBSound: Migration 007 — SCRIPT MESTRE CONSOLIDADO DEFINITIVO
--- (Combina Migrations 005 + 006 + Status Explícito 'pending'/'approved'
---  Alocação, Criação de Apartamentos, Limites de dB, RLS Total e Sincronização)
--- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
--- ---------------------------------------------------------------------
--- 1. CONDOMÍNIO E BLOCO PADRÃO (Impede qualquer erro de Foreign Key)
--- ---------------------------------------------------------------------
 INSERT INTO public.condominiums (id, name, address, created_at, updated_at)
 VALUES ('00000000-0000-0000-0000-000000000001'::UUID, 'Residencial dBSound', 'Av. das Nações Unidas, 1000', now(), now())
 ON CONFLICT (id) DO NOTHING;
@@ -17,10 +8,6 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.buildings (id, condominium_id, name, created_at)
 VALUES ('00000000-0000-0000-0000-000000000002'::UUID, '00000000-0000-0000-0000-000000000001'::UUID, 'Bloco Principal', now())
 ON CONFLICT (id) DO NOTHING;
-
--- ---------------------------------------------------------------------
--- 2. GARANTIA DAS UNIDADES BASE (101 a 303) NA TABELA APARTMENTS
--- ---------------------------------------------------------------------
 ALTER TABLE public.apartments 
     ADD COLUMN IF NOT EXISTS current_db NUMERIC(5, 2) DEFAULT 40.0,
     ADD COLUMN IF NOT EXISTS peak_db NUMERIC(5, 2) DEFAULT 40.0,
@@ -44,10 +31,6 @@ VALUES
 ON CONFLICT (id) DO UPDATE SET
     number = EXCLUDED.number,
     floor = EXCLUDED.floor;
-
--- ---------------------------------------------------------------------
--- 3. STATUS EXPLÍCITO EM PROFILES ('pending', 'approved', 'blocked')
--- ---------------------------------------------------------------------
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS chk_resident_apartment;
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS chk_resident_apartment_flexible;
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS chk_profile_status;
@@ -57,13 +40,7 @@ ALTER TABLE public.profiles
 
 ALTER TABLE public.profiles
     ADD CONSTRAINT chk_profile_status CHECK (status IN ('pending', 'approved', 'blocked'));
-
--- Atualiza administradores e perfis com apartamento existente para 'approved'
 UPDATE public.profiles SET status = 'approved' WHERE role = 'admin' OR apartment_id IS NOT NULL;
-
--- ---------------------------------------------------------------------
--- 4. POLÍTICAS RLS TOTALMENTE PERMISSIVAS (Elimina de vez erro 42501)
--- ---------------------------------------------------------------------
 DROP POLICY IF EXISTS "Permitir leitura de apartamentos" ON public.apartments;
 DROP POLICY IF EXISTS "Permitir criacao de apartamentos" ON public.apartments;
 DROP POLICY IF EXISTS "Permitir edicao de apartamentos" ON public.apartments;
@@ -118,10 +95,6 @@ CREATE POLICY "Permitir leitura de alertas" ON public.alerts FOR SELECT USING (t
 CREATE POLICY "Permitir criacao de alertas" ON public.alerts FOR INSERT WITH CHECK (true);
 CREATE POLICY "Permitir atualizacao de alertas" ON public.alerts FOR UPDATE USING (true);
 CREATE POLICY "Permitir delecao de alertas" ON public.alerts FOR DELETE USING (true);
-
--- ---------------------------------------------------------------------
--- 5. LIMPEZA PRÉVIA DE FUNÇÕES (EVITA ERRO 42P13 DE ALTERAÇÃO DE RETURN TYPE)
--- ---------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.clear_mock_apartments() CASCADE;
 DROP FUNCTION IF EXISTS public.clear_mock_apartments CASCADE;
 DROP FUNCTION IF EXISTS public.assign_resident_to_apartment(UUID, UUID) CASCADE;
@@ -136,10 +109,6 @@ DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 DROP FUNCTION IF EXISTS public.handle_new_user CASCADE;
 DROP FUNCTION IF EXISTS public.inject_noise_reading CASCADE;
 DROP FUNCTION IF EXISTS public.process_noise_reading CASCADE;
-
--- ---------------------------------------------------------------------
--- 5.1. RPC DE SINCRONIZAÇÃO COMPLETA COM AUTH.USERS (PUXA O BRENO E TODOS)
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.sync_and_get_all_profiles()
 RETURNS SETOF public.profiles AS $$
 DECLARE
@@ -152,8 +121,6 @@ BEGIN
         VALUES (v_condo_id, 'Residencial dBSound', 'Av. das Nações Unidas, 1000')
         ON CONFLICT (id) DO NOTHING;
     END IF;
-
-    -- Puxa qualquer usuário de auth.users que ainda não esteja em public.profiles
     INSERT INTO public.profiles (
         id, full_name, email, phone, role, status, condominium_id, apartment_id, created_at, updated_at
     )
@@ -188,10 +155,6 @@ BEGIN
     RETURN QUERY SELECT * FROM public.profiles ORDER BY created_at DESC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ---------------------------------------------------------------------
--- 6. TRIGGER AUTOMÁTICO EM AUTH.USERS
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -245,10 +208,6 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- ---------------------------------------------------------------------
--- 7. RPC ATÔMICA PARA APROVAR E ALOCAR MORADOR AO APARTAMENTO
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.assign_resident_to_apartment(
     p_profile_id UUID, 
     p_apartment_id UUID
@@ -257,7 +216,6 @@ RETURNS JSONB AS $$
 DECLARE
     v_apt RECORD;
 BEGIN
-    -- 1. Garante que o apartamento existe
     SELECT * INTO v_apt FROM public.apartments WHERE id = p_apartment_id;
     IF v_apt IS NULL THEN
         INSERT INTO public.apartments (
@@ -269,8 +227,6 @@ BEGIN
 
         SELECT * INTO v_apt FROM public.apartments WHERE id = p_apartment_id;
     END IF;
-
-    -- 2. Atualiza ou insere perfil se ainda não existir
     IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = p_profile_id) THEN
         INSERT INTO public.profiles (
             id, full_name, email, phone, role, status, condominium_id, apartment_id, created_at, updated_at
@@ -313,10 +269,6 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ---------------------------------------------------------------------
--- 8. RPC PARA DESVINCULAR MORADOR (RETORNA PARA PENDING)
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.unassign_resident_from_apartment(p_profile_id UUID)
 RETURNS JSONB AS $$
 BEGIN
@@ -332,10 +284,6 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ---------------------------------------------------------------------
--- 9. RPC PARA CRIAR NOVO APARTAMENTO E ALOCAR MORADOR NO ATO
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.create_apartment_and_assign(
     p_number TEXT,
     p_floor INT DEFAULT 1,
@@ -423,10 +371,6 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ---------------------------------------------------------------------
--- 10. RPC PARA LIMPAR APARTAMENTOS MOCKADOS
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.clear_mock_apartments()
 RETURNS JSONB AS $$
 BEGIN
@@ -442,10 +386,6 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ---------------------------------------------------------------------
--- 11. RPC PARA RECUPERAR OU CRIAR PERFIL
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_or_create_profile(
     p_user_id UUID, 
     p_email TEXT, 
@@ -515,10 +455,6 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ---------------------------------------------------------------------
--- 12. RPC DE INGESTÃO UNIFICADA DE TELEMETRIA (ESP32 / SIMULADOR)
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.inject_noise_reading(
     p_apartment_id UUID,
     p_decibel NUMERIC,
@@ -542,7 +478,6 @@ DECLARE
     v_new_alert RECORD := NULL;
     v_event_id UUID;
 BEGIN
-    -- 1. Buscar apartamento e seus limites configurados
     SELECT * INTO v_apt FROM public.apartments WHERE id = p_apartment_id;
     IF v_apt IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', 'Apartamento não encontrado');
@@ -557,15 +492,11 @@ BEGIN
         WHEN v_is_night THEN COALESCE(v_apt.custom_critical_threshold_db, 70.0)
         ELSE COALESCE(v_apt.custom_critical_threshold_db, 80.0)
     END;
-
-    -- 2. Inserir leitura na tabela noise_readings
     INSERT INTO public.noise_readings (
         apartment_id, decibel, source, is_test_data, sensor_id, device_id, recorded_at, created_at
     ) VALUES (
         p_apartment_id, p_decibel, p_source, p_is_test_data, p_sensor_id, p_device_id, v_now, v_now
     ) RETURNING * INTO v_new_reading;
-
-    -- 3. Classificar severidade da leitura atual
     IF p_decibel >= v_crit_threshold THEN
         v_severity := 'critical';
     ELSIF p_decibel >= v_warn_threshold THEN
@@ -573,33 +504,23 @@ BEGIN
     ELSE
         v_severity := 'normal';
     END IF;
-
-    -- 4. Atualizar telemetria em tempo real no apartamento (FONTE ÚNICA DA VERDADE)
     UPDATE public.apartments
     SET current_db = p_decibel,
         peak_db = GREATEST(COALESCE(peak_db, 0), p_decibel),
         avg_db = ROUND((((COALESCE(avg_db, 40.0) * 4) + p_decibel) / 5)::NUMERIC, 1),
         status = v_severity
     WHERE id = p_apartment_id;
-
-    -- 5. Avaliação de Regra de Duração / Debounce:
-    -- Conta quantas leituras consecutivas elevadas ocorreram nos últimos 15 segundos
     SELECT COUNT(*) INTO v_recent_high_count
     FROM public.noise_readings
     WHERE apartment_id = p_apartment_id
       AND recorded_at >= (v_now - INTERVAL '15 seconds')
       AND decibel >= v_warn_threshold;
-
-    -- Se atingiu o tempo mínimo de persistência (>= 3 amostras/segundos) e atingiu nível crítico
     IF v_recent_high_count >= v_min_duration AND p_decibel >= v_crit_threshold THEN
-        -- Criar ou atualizar noise_events
         INSERT INTO public.noise_events (
             apartment_id, device_id, sensor_id, peak_db, average_db, duration_seconds, started_at, ended_at, severity, source
         ) VALUES (
             p_apartment_id, p_device_id, p_sensor_id, p_decibel, p_decibel, v_recent_high_count, v_now - INTERVAL '3 seconds', v_now, 'critical', p_source
         ) RETURNING id INTO v_event_id;
-
-        -- Inserir alerta crítico
         INSERT INTO public.alerts (
             apartment_id, event_id, type, title, message, severity, read, created_at
         ) VALUES (
@@ -626,20 +547,12 @@ EXCEPTION
         RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- ---------------------------------------------------------------------
--- 13. OCORRÊNCIAS, DENÚNCIAS E MULTAS SIMULADAS
--- ---------------------------------------------------------------------
-
--- Atualizar colunas de ocorrências
 ALTER TABLE public.occurrences 
     ADD COLUMN IF NOT EXISTS apartment_number TEXT,
     ADD COLUMN IF NOT EXISTS syndic_notes TEXT,
     ADD COLUMN IF NOT EXISTS decision TEXT,
     ADD COLUMN IF NOT EXISTS decision_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS noise_level_db NUMERIC(5, 2);
-
--- Atualiza a restrição de status de ocorrências se existir
 DO $$ 
 BEGIN
     ALTER TABLE public.occurrences DROP CONSTRAINT IF EXISTS occurrences_status_check;
@@ -648,8 +561,6 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN NULL;
 END $$;
-
--- Tabela de Multas / Cobranças Simuladas
 CREATE TABLE IF NOT EXISTS public.fines (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     condominium_id UUID NOT NULL REFERENCES public.condominiums(id) ON DELETE CASCADE,
@@ -673,8 +584,6 @@ CREATE TABLE IF NOT EXISTS public.fines (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
--- Habilita e configura RLS para ocorrências, comentários e multas
 ALTER TABLE public.occurrences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.occurrence_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fines ENABLE ROW LEVEL SECURITY;
@@ -701,10 +610,6 @@ CREATE POLICY "Permitir leitura de multas" ON public.fines FOR SELECT USING (tru
 CREATE POLICY "Permitir insercao de multas" ON public.fines FOR INSERT WITH CHECK (true);
 CREATE POLICY "Permitir atualizacao de multas" ON public.fines FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir delecao de multas" ON public.fines FOR DELETE USING (true);
-
--- ---------------------------------------------------------------------
--- 14. CONVERSAS, CHAT BIDIRECIONAL E CHAT PREVENTIVO
--- ---------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.conversations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -757,10 +662,6 @@ CREATE POLICY "Permitir leitura de mensagens" ON public.conversation_messages FO
 CREATE POLICY "Permitir insercao de mensagens" ON public.conversation_messages FOR INSERT WITH CHECK (true);
 CREATE POLICY "Permitir atualizacao de mensagens" ON public.conversation_messages FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir delecao de mensagens" ON public.conversation_messages FOR DELETE USING (true);
-
--- ---------------------------------------------------------------------
--- 15. PERMISSÕES DE ACESSO TOTAIS
--- ---------------------------------------------------------------------
 GRANT ALL ON public.apartments TO anon, authenticated, service_role;
 GRANT ALL ON public.profiles TO anon, authenticated, service_role;
 GRANT ALL ON public.buildings TO anon, authenticated, service_role;
@@ -782,5 +683,4 @@ GRANT EXECUTE ON FUNCTION public.clear_mock_apartments() TO anon, authenticated,
 GRANT EXECUTE ON FUNCTION public.sync_and_get_all_profiles() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.inject_noise_reading(UUID, NUMERIC, TEXT, BOOLEAN, UUID, UUID) TO anon, authenticated, service_role;
-
 

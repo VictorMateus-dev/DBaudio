@@ -43,7 +43,6 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [fines, setFines] = useState<SimulatedFine[]>([]);
 
-  // Modais de Controle
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isBulletinModalOpen, setIsBulletinModalOpen] = useState(false);
   const [isNewOccurrenceModalOpen, setIsNewOccurrenceModalOpen] = useState(false);
@@ -51,26 +50,22 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
   const [isBillingDocModalOpen, setIsBillingDocModalOpen] = useState(false);
   const [activeFineToView, setActiveFineToView] = useState<SimulatedFine | null>(null);
 
-  // Chat Síndico <-> Morador
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [chatMessages, setChatMessages] = useState<ConversationMessage[]>([]);
   const [newChatMessage, setNewChatMessage] = useState('');
   const [isSendingChatMessage, setIsSendingChatMessage] = useState(false);
 
-  // Decisão do Síndico
   const [decisionMode, setDecisionMode] = useState<OccurrenceStatus>('em análise');
   const [syndicNotes, setSyndicNotes] = useState('');
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [decisionSuccessMsg, setDecisionSuccessMsg] = useState<string | null>(null);
 
-  // Cancelamento de Multa
   const [isCancelFineModalOpen, setIsCancelFineModalOpen] = useState(false);
   const [fineToCancel, setFineToCancel] = useState<SimulatedFine | null>(null);
   const [cancellationReason, setCancellationReason] = useState('');
   const [isCancellingFine, setIsCancellingFine] = useState(false);
 
-  // Formulário de Multa
   const [fineAmount, setFineAmount] = useState<number>(150);
   const [fineDueDate, setFineDueDate] = useState<string>(() => {
     const d = new Date();
@@ -80,7 +75,6 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
   const [fineReason, setFineReason] = useState('Infração por ruído excessivo acima dos limites permitidos');
   const [fineNotes, setFineNotes] = useState('');
 
-  // Formulário de Nova Ocorrência (Síndico)
   const [newType, setNewType] = useState('Música Alta / Som Mecânico');
   const [newTargetAptId, setNewTargetAptId] = useState('');
   const [newLocation, setNewLocation] = useState('');
@@ -100,7 +94,6 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
     loadData();
   }, []);
 
-  // Mantém ocorrência selecionada sincronizada
   useEffect(() => {
     if (occurrences.length > 0) {
       if (!selectedOccurrence) {
@@ -125,7 +118,6 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
     }
   }, [selectedOccurrence]);
 
-  // Sincronização em tempo real quando o modal de chat estiver aberto
   useEffect(() => {
     if (!isChatModalOpen || !activeConversation) return;
 
@@ -159,7 +151,6 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
     setNewCommentText('');
   };
 
-  // Abrir Chat a partir de uma ocorrência
   const handleOpenOccurrenceChat = async (targetOcc?: Occurrence) => {
     const occ = targetOcc || selectedOccurrence;
     if (!occ) return;
@@ -192,14 +183,12 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
     setIsChatModalOpen(true);
   };
 
-  // Abrir Modal de Multa para uma ocorrência específica
   const handleOpenFineModalFor = (occ: Occurrence) => {
     setSelectedOccurrence(occ);
     setFineReason(`Infração: ${occ.type} na unidade ${occ.apartment_number || occ.location}`);
     setIsFineModalOpen(true);
   };
 
-  // Aplicação rápida de Advertência diretamente no card
   const handleApplyWarningFor = async (occ: Occurrence) => {
     setSelectedOccurrence(occ);
     await DataService.decideOccurrence(
@@ -213,20 +202,17 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
     onRefresh();
   };
 
-  // Abertura do Modal de Detalhes
   const handleOpenDetailsFor = (occ: Occurrence) => {
     setSelectedOccurrence(occ);
     setIsDetailsModalOpen(true);
   };
 
-  // Abertura do Modal de Cancelamento de Multa
   const handleOpenCancelModal = (fine: SimulatedFine) => {
     setFineToCancel(fine);
     setCancellationReason('');
     setIsCancelFineModalOpen(true);
   };
 
-  // Confirmação de Cancelamento de Multa com Auditoria
   const handleConfirmCancelFine = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fineToCancel || !cancellationReason.trim() || isCancellingFine) return;
@@ -272,7 +258,6 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
     }
   };
 
-  // Aplicação da Decisão do Síndico no Modal de Detalhes
   const handleApplyDecision = async (overrideDecision?: OccurrenceStatus) => {
     if (!selectedOccurrence) return;
     const targetDecision = overrideDecision || decisionMode;
@@ -297,7 +282,6 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
     }
   };
 
-  // Confirmação de Aplicação de Multa
   const handleConfirmFine = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOccurrence) return;
@@ -331,11 +315,9 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
     await loadData();
     onRefresh();
 
-    // Oferece abertura direta do documento de cobrança simulada na rota dedicada
     window.open(`/boleto/${fine.id}`, '_blank');
   };
 
-  // Simular Pagamento da Multa
   const handleSimulatePayment = async (fineId: string) => {
     const ok = await DataService.simulatePayFine(fineId);
     if (ok) {
@@ -347,7 +329,6 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
     }
   };
 
-  // Criação de Ocorrência Manual pelo Síndico
   const handleCreateOccurrence = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDescription.trim()) return;
@@ -376,12 +357,10 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
     onRefresh();
   };
 
-  // Multa associada à ocorrência selecionada
   const linkedFine = selectedOccurrence
     ? fines.find(f => f.occurrence_id === selectedOccurrence.id || (selectedOccurrence.apartment_id && f.apartment_id === selectedOccurrence.apartment_id && f.status === 'pendente'))
     : null;
 
-  // Filtragem conforme os critérios solicitados
   const filteredOccurrences = occurrences.filter(occ => {
     let matchesStatus = true;
     if (filterStatus !== 'all') {
@@ -432,9 +411,9 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 animate-fadeIn">
-      {/* ========================================================================= */}
-      {/* 1. TOPBAR / CABEÇALHO */}
-      {/* ========================================================================= */}
+      
+      
+      
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
         <div>
           <div className="flex items-center gap-3">
@@ -472,7 +451,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
         </div>
       </header>
 
-      {/* Decision Success Notification */}
+      
       {decisionSuccessMsg && (
         <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5 animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -480,11 +459,11 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 2. BARRA DE FILTROS HORIZONTAL (100% LARGURA, RESPONSIVA, SEM CORTES) */}
-      {/* ========================================================================= */}
+      
+      
+      
       <div className="w-full space-y-3">
-        {/* Abas horizontais de status */}
+        
         <div className="flex flex-wrap items-center gap-2 bg-space-900/90 p-2 rounded-2xl border border-white/10 w-full shadow-inner">
           {[
             { id: 'all', label: 'Todos' },
@@ -513,7 +492,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
           })}
         </div>
 
-        {/* Linha de busca por texto e filtro de apartamento */}
+        
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
           <div className="md:col-span-2 relative">
             <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -541,9 +520,9 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 3. LISTA DE OCORRÊNCIAS (CARDS COM LARGURA TOTAL width: 100%) */}
-      {/* ========================================================================= */}
+      
+      
+      
       <div className="w-full space-y-4">
         {filteredOccurrences.length === 0 ? (
           <div className="w-full p-12 text-center text-slate-500 text-sm vault-card rounded-3xl border border-white/10">
@@ -560,27 +539,27 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                 key={occ.id}
                 className="w-full p-5 sm:p-6 rounded-3xl bg-space-900/90 border border-white/10 hover:border-violet-500/40 transition-all shadow-lg space-y-4 relative overflow-hidden"
               >
-                {/* Linha Superior: Ícone de Som + dB, Apartamento, Data/Hora, Status Badge */}
+                
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3 flex-wrap">
-                    {/* Telemetria Acústica */}
+                    
                     <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold ${noiseBadge}`}>
                       <Volume2 className="w-4 h-4" />
                       <span>{noiseVal.toFixed(1)} dB SPL</span>
                     </div>
 
-                    {/* Unidade */}
+                    
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-violet-300">
                       <Building2 className="w-4 h-4 text-violet-400" />
                       <span>Apto {occ.apartment_number || occ.location?.replace(/[^0-9]/g, '') || 'Geral'}</span>
                     </div>
 
-                    {/* Tipo / Assunto */}
+                    
                     <h3 className="text-sm sm:text-base font-bold text-white tracking-wide">
                       {occ.type}
                     </h3>
 
-                    {/* Data e Hora */}
+                    
                     <span className="text-xs text-slate-400 flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5 text-slate-500" />
                       {new Date(occ.occurred_at).toLocaleString('pt-BR')}
@@ -598,15 +577,15 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                   </div>
                 </div>
 
-                {/* Linha Central: Descrição do Relato */}
+                
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed bg-space-950/50 p-3.5 rounded-2xl border border-white/5">
                   {occ.description}
                 </p>
 
-                {/* Linha Inferior: Botões de Ação Rápida no Próprio Card */}
+                
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/5">
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Botão Chat */}
+                    
                     <button
                       type="button"
                       onClick={() => handleOpenOccurrenceChat(occ)}
@@ -617,7 +596,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                       <span>💬 Chat</span>
                     </button>
 
-                    {/* Botão Advertência */}
+                    
                     <button
                       type="button"
                       onClick={() => handleApplyWarningFor(occ)}
@@ -628,7 +607,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                       <span>⚠️ Advertência</span>
                     </button>
 
-                    {/* Botão Multa */}
+                    
                     <button
                       type="button"
                       onClick={() => handleOpenFineModalFor(occ)}
@@ -639,7 +618,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                       <span>💰 Multa</span>
                     </button>
 
-                    {/* Botão Boleto se já existir multa */}
+                    
                     {occFine && (
                       <button
                         type="button"
@@ -654,7 +633,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                   </div>
 
                   <div>
-                    {/* Botão Ver Detalhes */}
+                    
                     <button
                       type="button"
                       onClick={() => handleOpenDetailsFor(occ)}
@@ -671,13 +650,13 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
         )}
       </div>
 
-      {/* ========================================================================= */}
-      {/* 4. MODAL DE DETALHES COMPLETO ("Ver detalhes") */}
-      {/* ========================================================================= */}
+      
+      
+      
       {isDetailsModalOpen && selectedOccurrence && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn">
           <div className="vault-card rounded-3xl p-6 w-full max-w-4xl space-y-6 border border-violet-500/30 shadow-2xl max-h-[92vh] overflow-y-auto">
-            {/* Header do Modal */}
+            
             <div className="flex items-start justify-between gap-4 pb-4 border-b border-white/10">
               <div className="space-y-1">
                 <div className="flex items-center gap-2.5 flex-wrap">
@@ -701,9 +680,9 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               </button>
             </div>
 
-            {/* Grid com Informações e Telemetria */}
+            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Informações da Unidade e Denunciante */}
+              
               <div className="md:col-span-2 p-4 rounded-2xl bg-space-950/70 border border-white/10 space-y-2.5">
                 <h4 className="text-xs uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1.5">
                   <Building2 className="w-4 h-4 text-violet-400" />
@@ -730,7 +709,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                 </p>
               </div>
 
-              {/* Card de Evidência Acústica */}
+              
               <div className="p-4 rounded-2xl bg-space-950/70 border border-white/10 flex flex-col justify-between space-y-3">
                 <div>
                   <h4 className="text-xs uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1.5">
@@ -751,7 +730,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               </div>
             </div>
 
-            {/* Seção de Comunicação Direta com o Morador */}
+            
             <div className="p-4 rounded-2xl bg-gradient-to-r from-violet-950/50 via-purple-950/30 to-space-950 border border-violet-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-violet-600/20 border border-violet-500/40 text-violet-400 flex items-center justify-center shrink-0">
@@ -777,7 +756,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               </button>
             </div>
 
-            {/* Linha do Tempo & Histórico Integrado */}
+            
             <div className="p-5 rounded-2xl bg-space-950/60 border border-white/10 space-y-3">
               <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <Clock className="w-4 h-4 text-violet-400" />
@@ -785,7 +764,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               </h4>
 
               <div className="relative pl-6 space-y-3.5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/10 text-xs">
-                {/* 1. Sensor Telemetry */}
+                
                 <div className="relative">
                   <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center">
                     <Volume2 className="w-2 h-2 text-amber-300" />
@@ -799,7 +778,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                   </div>
                 </div>
 
-                {/* 2. Denúncia Registrada */}
+                
                 <div className="relative">
                   <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-blue-500/20 border-2 border-blue-400 flex items-center justify-center">
                     <FileText className="w-2 h-2 text-blue-300" />
@@ -813,7 +792,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
                   </div>
                 </div>
 
-                {/* 3. Decisão Atual */}
+                
                 {selectedOccurrence.decision && (
                   <div className="relative">
                     <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-violet-500/20 border-2 border-violet-400 flex items-center justify-center">
@@ -828,7 +807,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               </div>
             </div>
 
-            {/* Painel de Parecer e Decisão do Síndico */}
+            
             <div className="p-5 rounded-2xl bg-space-950/80 border border-violet-500/20 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -892,7 +871,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               </div>
             </div>
 
-            {/* Multa Associada (se houver) */}
+            
             {linkedFine && (
               <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                 linkedFine.status === 'cancelada'
@@ -953,7 +932,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               </div>
             )}
 
-            {/* Auditoria / Comentários */}
+            
             <div className="space-y-3 pt-3 border-t border-white/10">
               <h4 className="text-xs font-bold text-white flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-violet-400" />
@@ -999,9 +978,9 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: BOLETIM GERAL DE MULTAS & INFRAÇÕES */}
-      {/* ========================================================================= */}
+      
+      
+      
       {isBulletinModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
           <div className="vault-card rounded-3xl p-6 w-full max-w-2xl space-y-5 border border-white/15 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -1019,7 +998,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               </button>
             </div>
 
-            {/* Resumo Financeiro / Administrativo */}
+            
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="p-3.5 rounded-2xl bg-space-950/80 border border-white/5">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Total de Multas</span>
@@ -1039,7 +1018,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               </div>
             </div>
 
-            {/* Lista de Multas e Boletos */}
+            
             <div className="space-y-2.5">
               <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                 Documentos de Cobrança Simulada Gerados
@@ -1084,13 +1063,13 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: CHAT COM O MORADOR DA OCORRÊNCIA (COM SUPORTE REALTIME) */}
-      {/* ========================================================================= */}
+      
+      
+      
       {isChatModalOpen && selectedOccurrence && activeConversation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn">
           <div className="vault-card rounded-3xl p-6 w-full max-w-2xl space-y-4 border border-violet-500/40 shadow-2xl flex flex-col max-h-[90vh]">
-            {/* Header */}
+            
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-violet-600/20 border border-violet-500/40 text-violet-400 flex items-center justify-center">
@@ -1118,13 +1097,13 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               </button>
             </div>
 
-            {/* Context Notice */}
+            
             <div className="p-3 rounded-xl bg-violet-950/30 border border-violet-500/20 text-[11px] text-violet-300 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-violet-400 shrink-0" />
               <span>Mensagens entregues em tempo real. O anonimato da denúncia permanece 100% resguardado.</span>
             </div>
 
-            {/* Quick Presets */}
+            
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
               <span className="text-slate-500 text-[10px] shrink-0 font-bold uppercase">Modelos:</span>
               {[
@@ -1143,7 +1122,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               ))}
             </div>
 
-            {/* Messages Thread */}
+            
             <div className="flex-1 overflow-y-auto p-4 space-y-3 rounded-2xl bg-space-950/70 border border-white/5 min-h-[260px] max-h-[380px]">
               {chatMessages.length === 0 ? (
                 <div className="text-center py-10 text-slate-500 text-xs">
@@ -1185,7 +1164,7 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
               )}
             </div>
 
-            {/* Form Input */}
+            
             <form onSubmit={handleSendChatMessage} className="flex gap-2 pt-2 border-t border-white/10">
               <input
                 type="text"
@@ -1207,9 +1186,9 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: APLICAR MULTA SIMULADA */}
-      {/* ========================================================================= */}
+      
+      
+      
       {isFineModalOpen && selectedOccurrence && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="vault-card rounded-3xl p-6 w-full max-w-lg space-y-5 border border-red-500/30 shadow-2xl">
@@ -1302,9 +1281,9 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: DOCUMENTO DE COBRANÇA (FALLBACK INTERNO) */}
-      {/* ========================================================================= */}
+      
+      
+      
       {isBillingDocModalOpen && activeFineToView && (
         <PrintableBoleto
           fine={activeFineToView}
@@ -1313,9 +1292,9 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
         />
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: CANCELAR MULTA SIMULADA (COM AUDITORIA) */}
-      {/* ========================================================================= */}
+      
+      
+      
       {isCancelFineModalOpen && fineToCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
           <div className="vault-card rounded-3xl p-6 w-full max-w-md space-y-4 border border-red-500/30 shadow-2xl">
@@ -1374,9 +1353,9 @@ export const OccurrencesPage: React.FC<OccurrencesPageProps> = ({ occurrences, o
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: REGISTRAR NOVA OCORRÊNCIA (PELO SÍNDICO) */}
-      {/* ========================================================================= */}
+      
+      
+      
       {isNewOccurrenceModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="vault-card rounded-3xl p-6 w-full max-w-lg space-y-4">

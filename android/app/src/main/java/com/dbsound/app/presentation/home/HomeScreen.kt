@@ -37,7 +37,6 @@ fun HomeScreen(
 ) {
     var activeModalAlert by remember { mutableStateOf<AlertNotification?>(null) }
 
-    // Disparar modal de ruído alto automaticamente se houver alerta crítico não lido
     LaunchedEffect(alerts) {
         val unreadCritical = alerts.firstOrNull { it.severity == "critical" && !it.isRead }
         if (unreadCritical != null && activeModalAlert == null) {
@@ -99,7 +98,6 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Decibel Gauge Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -131,7 +129,6 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Large Meter Circle
                         Box(
                             modifier = Modifier
                                 .size(180.dp)
@@ -167,7 +164,6 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Status Badge
                         val (statusText, statusBg, statusColor) = when (telemetry.status) {
                             "critical" -> Triple("Ruído Elevado", Color(0x33EF4444), NoiseRed)
                             "warning" -> Triple("Atenção", Color(0x33F59E0B), NoiseAmber)
@@ -191,7 +187,6 @@ fun HomeScreen(
                 }
             }
 
-            // Quick Stats Row: Média 24h e Último Pico
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -237,7 +232,6 @@ fun HomeScreen(
                 }
             }
 
-            // Quick Action: Criar Ocorrência
             item {
                 Button(
                     onClick = onNavigateToOccurrences,
@@ -253,7 +247,6 @@ fun HomeScreen(
                 }
             }
 
-            // Alertas Recentes Section
             item {
                 Text(
                     text = "Alertas Recentes",
@@ -327,7 +320,6 @@ fun HomeScreen(
         }
     }
 
-    // Modal de Alerta Crítico (Conforme Requisito 23)
     activeModalAlert?.let { alert ->
         HighNoiseAlertModal(
             alert = alert,

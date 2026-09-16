@@ -29,7 +29,7 @@ export const PoliciesPage: React.FC<PoliciesPageProps> = ({ policies, onRefresh 
 
   return (
     <div className="p-8 space-y-6 max-w-5xl mx-auto">
-      {/* Header */}
+      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Políticas de Ruído e Limiares Acústicos</h1>
@@ -54,7 +54,7 @@ export const PoliciesPage: React.FC<PoliciesPageProps> = ({ policies, onRefresh 
         </div>
       )}
 
-      {/* Policies Cards */}
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {editablePolicies.map((pol) => {
           const isNight = pol.name.toLowerCase().includes('noturna');
@@ -79,7 +79,7 @@ export const PoliciesPage: React.FC<PoliciesPageProps> = ({ policies, onRefresh 
                 </span>
               </div>
 
-              {/* Threshold inputs */}
+              
               <div className="space-y-4 text-xs">
                 <div>
                   <div className="flex justify-between mb-1.5 font-medium">

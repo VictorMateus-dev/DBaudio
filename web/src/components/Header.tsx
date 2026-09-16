@@ -13,7 +13,6 @@ export const Header: React.FC<HeaderProps> = ({ alerts, onSelectApartment }) => 
   const { isDemoMode } = useAuth();
   const [showAlertDropdown, setShowAlertDropdown] = useState(false);
 
-  // Determinar política vigente atual
   const now = new Date();
   const hour = now.getHours();
   const isNight = hour >= 22 || hour < 7;
@@ -24,7 +23,7 @@ export const Header: React.FC<HeaderProps> = ({ alerts, onSelectApartment }) => 
 
   return (
     <header className="h-16 w-full shrink-0 bg-space-950/80 backdrop-blur-xl border-b border-white/5 px-6 md:px-8 flex items-center justify-between sticky top-0 z-20">
-      {/* Condominium details & Active Policy */}
+      
       <div className="flex items-center space-x-6 min-w-0">
         <div className="shrink-0">
           <h2 className="text-xs font-bold text-white flex items-center gap-1.5 whitespace-nowrap">
@@ -36,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({ alerts, onSelectApartment }) => 
 
         <div className="h-5 w-px bg-white/10 hidden lg:block shrink-0"></div>
 
-        {/* Current Active Noise Policy Pill */}
+        
         <div className="hidden md:flex items-center space-x-2 bg-space-900/90 px-3 py-1.5 rounded-full border border-white/10 text-xs">
           <Clock className="w-3.5 h-3.5 text-violet-400" />
           <span className="text-slate-400">Vigência Geral:</span>
@@ -47,9 +46,9 @@ export const Header: React.FC<HeaderProps> = ({ alerts, onSelectApartment }) => 
         </div>
       </div>
 
-      {/* Right status items: Connection mode & Notification Center */}
+      
       <div className="flex items-center space-x-3">
-        {/* Environment Status Badge */}
+        
         {isDemoMode ? (
           <div className="flex items-center space-x-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-xs font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
@@ -62,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({ alerts, onSelectApartment }) => 
           </div>
         )}
 
-        {/* Notifications Dropdown */}
+        
         <div className="relative">
           <button
             onClick={() => setShowAlertDropdown(!showAlertDropdown)}

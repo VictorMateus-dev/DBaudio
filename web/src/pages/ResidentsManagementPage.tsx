@@ -13,12 +13,10 @@ export const ResidentsManagementPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Modals state
   const [selectedUserHistory, setSelectedUserHistory] = useState<UserHistoryReport | null>(null);
   const [allocatingProfile, setAllocatingProfile] = useState<Profile | null>(null);
   const [selectedApartmentId, setSelectedApartmentId] = useState<string>('');
 
-  // Apartment Create / Edit Modals
   const [showCreateAptModal, setShowCreateAptModal] = useState(false);
   const [newAptNumber, setNewAptNumber] = useState('');
   const [newAptFloor, setNewAptFloor] = useState(1);
@@ -31,7 +29,6 @@ export const ResidentsManagementPage: React.FC = () => {
   const [editNightDb, setEditNightDb] = useState(60);
   const [editCritDb, setEditCritDb] = useState(80);
 
-  // Estados para Alocação Flexível (Unidade Existente ou Criação On-the-Fly)
   const [allocationMode, setAllocationMode] = useState<'existing' | 'new'>('existing');
   const [inlineAptNumber, setInlineAptNumber] = useState('');
   const [inlineAptFloor, setInlineAptFloor] = useState(1);
@@ -80,7 +77,6 @@ export const ResidentsManagementPage: React.FC = () => {
     setInlineCritDb(80);
   };
 
-  // Handlers for Resident Assignment
   const handleAssignApartment = async () => {
     if (!allocatingProfile) return;
 
@@ -152,7 +148,6 @@ export const ResidentsManagementPage: React.FC = () => {
     }
   };
 
-  // Handlers for Apartment Management
   const handleCreateApartment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAptNumber.trim()) return;
@@ -212,7 +207,6 @@ export const ResidentsManagementPage: React.FC = () => {
 
   const pendingResidents = profiles.filter(p => {
     const isExplicitAdmin = p.role === 'admin' && (p.email.toLowerCase().includes('admin') || p.email === 'admin@dbsound.com');
-    // Qualquer usuário que não seja estritamente o admin e não tenha apartamento alocado é considerado pendente!
     return !isExplicitAdmin && !p.apartment_id && !p.apartment_number;
   });
 
@@ -229,7 +223,7 @@ export const ResidentsManagementPage: React.FC = () => {
 
   return (
     <div className="space-y-7 animate-fadeIn">
-      {/* Top Header & Metrics */}
+      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -245,7 +239,7 @@ export const ResidentsManagementPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Action Tabs Selector & Cloud Sync Button */}
+        
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -295,7 +289,7 @@ export const ResidentsManagementPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Feedback Alert */}
+      
       {feedbackMsg && (
         <div className={`p-3.5 rounded-2xl border text-xs flex items-center gap-2.5 animate-fadeIn ${
           feedbackMsg.type === 'success' 
@@ -307,7 +301,7 @@ export const ResidentsManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* PENDING RESIDENTS ALERT BANNER (Shows in both tabs if there are pending users) */}
+      
       {pendingResidents.length > 0 && (
         <div className="vault-card rounded-3xl p-5 border-amber-500/30 bg-amber-500/[0.03] space-y-4">
           <div className="flex items-center justify-between">
@@ -351,12 +345,12 @@ export const ResidentsManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 1: RESIDENTS MANAGEMENT */}
-      {/* ========================================================================= */}
+      
+      
+      
       {activeTab === 'residents' && (
         <div className="space-y-5">
-          {/* Search bar */}
+          
           <div className="flex items-center justify-between gap-4">
             <div className="relative flex-1 max-w-md">
               <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -373,7 +367,7 @@ export const ResidentsManagementPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Residents Table / Cards */}
+          
           <div className="vault-card rounded-3xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -473,12 +467,12 @@ export const ResidentsManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 2: APARTMENTS & CUSTOM dB LIMITS */}
-      {/* ========================================================================= */}
+      
+      
+      
       {activeTab === 'apartments' && (
         <div className="space-y-6">
-          {/* Top Actions Bar */}
+          
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-white">Unidades Residenciais & Calibração Acústica</h2>
@@ -506,7 +500,7 @@ export const ResidentsManagementPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Apartments Cards Grid */}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {apartments.length === 0 ? (
               <div className="col-span-full vault-card rounded-3xl p-12 text-center space-y-3">
@@ -529,11 +523,10 @@ export const ResidentsManagementPage: React.FC = () => {
                   p.apartment_id === apt.id || 
                   (p.apartment_number && apt.number && p.apartment_number.trim() === apt.number.trim())
                 );
-                // Prioriza o usuário real (email diferente de @dbsound.com) em vez do morador mockado
                 const resident = matching.find(p => !p.email.includes('@dbsound.com')) || matching[0];
                 return (
                   <div key={apt.id} className="vault-card rounded-3xl p-5 space-y-4 relative group">
-                    {/* Apartment Header */}
+                    
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600/30 to-purple-600/30 border border-violet-500/30 flex items-center justify-center text-white font-bold text-sm">
@@ -555,7 +548,7 @@ export const ResidentsManagementPage: React.FC = () => {
                       </button>
                     </div>
 
-                    {/* Resident Info */}
+                    
                     <div className="p-3 rounded-2xl bg-space-900/80 border border-white/5 flex items-center justify-between text-xs">
                       <span className="text-slate-400">Morador:</span>
                       {resident ? (
@@ -580,7 +573,7 @@ export const ResidentsManagementPage: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Decibel Limits Display */}
+                    
                     <div className="space-y-2 pt-1 border-t border-white/5">
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-slate-400 flex items-center gap-1">
@@ -625,9 +618,9 @@ export const ResidentsManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 1: ALOCAR MORADOR AO APARTAMENTO */}
-      {/* ========================================================================= */}
+      
+      
+      
       {allocatingProfile && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="vault-card rounded-3xl p-6 w-full max-w-md space-y-5 shadow-glass-card animate-fadeIn">
@@ -660,7 +653,7 @@ export const ResidentsManagementPage: React.FC = () => {
               <div className="text-slate-400">{allocatingProfile.email}</div>
             </div>
 
-            {/* Alternador de Modo: Unidade Existente vs Criar Nova */}
+            
             <div className="grid grid-cols-2 p-1 rounded-xl bg-space-900 border border-white/5 text-xs">
               <button
                 type="button"
@@ -689,7 +682,7 @@ export const ResidentsManagementPage: React.FC = () => {
               </button>
             </div>
 
-            {/* MODO 1: SELECIONAR UNIDADE EXISTENTE */}
+            
             {allocationMode === 'existing' && (
               <div className="space-y-3 text-xs animate-fadeIn">
                 {apartments.length === 0 ? (
@@ -715,7 +708,7 @@ export const ResidentsManagementPage: React.FC = () => {
               </div>
             )}
 
-            {/* MODO 2: CRIAR NOVA UNIDADE E ALOCAR DIRETAMENTE */}
+            
             {allocationMode === 'new' && (
               <div className="space-y-3 text-xs animate-fadeIn">
                 <div className="grid grid-cols-2 gap-3">
@@ -796,13 +789,13 @@ export const ResidentsManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 2: HISTÓRICO ACÚSTICO COMPLETO DO USUÁRIO */}
-      {/* ========================================================================= */}
+      
+      
+      
       {selectedUserHistory && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="vault-card rounded-3xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto space-y-6 shadow-glass-card animate-fadeIn">
-            {/* Modal Header */}
+            
             <div className="flex items-start justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-violet-600 to-purple-600 flex items-center justify-center text-white font-bold">
@@ -829,7 +822,7 @@ export const ResidentsManagementPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Quick Stats Grid */}
+            
             <div className="grid grid-cols-4 gap-3">
               <div className="p-3 rounded-2xl bg-space-900/80 border border-white/5 text-center">
                 <div className="text-[10px] text-slate-400">Alertas Recebidos</div>
@@ -851,7 +844,7 @@ export const ResidentsManagementPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Timeline: Alertas da Unidade */}
+            
             <div className="space-y-2.5">
               <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
@@ -878,7 +871,7 @@ export const ResidentsManagementPage: React.FC = () => {
               )}
             </div>
 
-            {/* Timeline: Ocorrências Vinculadas */}
+            
             <div className="space-y-2.5">
               <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                 <History className="w-3.5 h-3.5 text-violet-400" />
@@ -919,9 +912,9 @@ export const ResidentsManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 3: NOVO APARTAMENTO COM LIMITES DE dB */}
-      {/* ========================================================================= */}
+      
+      
+      
       {showCreateAptModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <form onSubmit={handleCreateApartment} className="vault-card rounded-3xl p-6 w-full max-w-md space-y-5 shadow-glass-card animate-fadeIn">
@@ -966,7 +959,7 @@ export const ResidentsManagementPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Custom dB Limits */}
+            
             <div className="space-y-3 pt-2 border-t border-white/10 text-xs">
               <div className="font-semibold text-white flex items-center gap-1.5">
                 <Sliders className="w-4 h-4 text-violet-400" />
@@ -1025,9 +1018,9 @@ export const ResidentsManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 4: EDITAR LIMITES DE dB DO APARTAMENTO */}
-      {/* ========================================================================= */}
+      
+      
+      
       {editingAptThresholds && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <form onSubmit={handleSaveThresholds} className="vault-card rounded-3xl p-6 w-full max-w-md space-y-5 shadow-glass-card animate-fadeIn">

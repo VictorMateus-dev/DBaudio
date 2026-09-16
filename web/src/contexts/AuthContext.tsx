@@ -51,7 +51,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<Profile | null>(() => {
-    // Se Supabase não estiver configurado, usa perfil demo síndico
     if (!isSupabaseConfigured) return defaultAdminProfile;
     return null;
   });
@@ -72,7 +71,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (isSupabaseConfigured && supabase) {
       try {
-        // 1. Tenta carregar perfil completo com join em apartments
         const { data, error } = await supabase
           .from('profiles')
           .select('*, apartments(number)')
@@ -109,7 +107,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        // 2. Se join falhar, tenta consulta direta em profiles
         const { data: rawData, error: rawError } = await supabase
           .from('profiles')
           .select('*')
@@ -154,7 +151,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        // 3. Se o perfil não existir (ex: falha no trigger), auto-recupera via RPC
         if (authUserEmail) {
           try {
             const { data: rpcData, error: rpcError } = await supabase.rpc('get_or_create_profile', {
@@ -190,7 +186,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // Fallback local store
     const localProf = localStore.profiles.find(p => p.id === userId || (authUserEmail && p.email.toLowerCase() === authUserEmail.toLowerCase()));
     if (localProf) {
       if (storedAptId) {
@@ -220,7 +215,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      // PERSISTÊNCIA ATIVA: Garante que o perfil seja salvo no Supabase para que o síndico veja imediatamente!
       await DataService.saveProfile(tempProf);
       setUser(tempProf);
       setRole(tempProf.role);
@@ -273,7 +267,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cleanEmail = email.trim().toLowerCase();
       const client = supabase;
 
-      // 1. Tenta login no Supabase se configurado
       if (isSupabaseConfigured && client) {
         const { data, error } = await client.auth.signInWithPassword({
           email: cleanEmail,
@@ -297,7 +290,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 2. Demo e Contas Locais (Morador 101, Síndico, ou usuário recém-criado)
       const allProfiles = await DataService.getProfiles();
       const foundInStore = allProfiles.find(p => p.email.toLowerCase() === cleanEmail);
       if (foundInStore) {
@@ -307,7 +299,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: true };
       }
 
-      // 3. Fallbacks diretos para Morador 101 e Síndico
       if (cleanEmail === 'morador101@dbsound.com' || cleanEmail.includes('101') || cleanEmail.includes('morador101')) {
         const apt101 = localStore.apartments.find(a => a.number === '101') || {
           id: '10100000-0000-0000-0000-000000000101',
@@ -387,8 +378,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // CRUCIAL: Cria o perfil de morador pendente e SALVA IMEDIATAMENTE!
-      // Isso garante que o síndico veja na MESMA HORA o morador pendente na aba de Moradores!
       const newProfile: Profile = {
         id: userId,
         full_name: cleanName,
@@ -436,7 +425,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const switchRole = (newRole: Role) => {
     setUser(prev => {
-      // Se não há usuário logado, utiliza os perfis de demonstração
       if (!prev) {
         setRole(newRole);
         return newRole === 'admin' ? defaultAdminProfile : defaultResidentProfile;
@@ -445,7 +433,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isDemo = prev.email === 'admin@dbsound.com' || prev.email === 'morador101@dbsound.com';
       const isActualAdmin = isDemo || prev.email?.toLowerCase().includes('admin') || prev.role === 'admin';
 
-      // Usuário comum (morador) não pode se auto-promover a síndico!
       if (!isActualAdmin && newRole === 'admin') {
         console.warn('Acesso negado: moradores não possuem permissão para alternar para síndico.');
         return prev;
@@ -457,7 +444,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return newRole === 'admin' ? defaultAdminProfile : defaultResidentProfile;
       }
 
-      // Usuário real: preserva os dados do usuário original
       if (newRole === 'resident') {
         const allocs = getStoredAllocations();
         const effectiveAptId = prev.apartment_id || allocs[prev.id] || null;

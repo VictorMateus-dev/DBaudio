@@ -27,7 +27,6 @@ export const NoiseChart: React.FC<NoiseChartProps> = ({
   criticalThreshold = 80,
   height = 240,
 }) => {
-  // Caso de dados vazios, gerar histórico demonstrativo suave
   const chartData = data.length > 0 ? data : [
     { time: '14:00', decibel: 44 },
     { time: '15:00', decibel: 48 },

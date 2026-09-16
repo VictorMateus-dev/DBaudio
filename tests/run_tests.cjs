@@ -1,10 +1,3 @@
-/**
- * ==============================================================================
- * dBSound — Suíte de Testes Automatizados em Node.js
- * Executa a validação dos Cenários 1 a 6 e das regras de negócio do pipeline
- * ==============================================================================
- */
-
 class NoiseEngineSimulator {
   constructor() {
     this.policies = [
@@ -25,19 +18,16 @@ class NoiseEngineSimulator {
     return this.isNightTime(timeStr) ? this.policies[1] : this.policies[0];
   }
 
-  // Simula a exata lógica do trigger trg_process_noise_reading
   processReading(apartmentId, decibel, timeStr = '14:00', durationSec = 1) {
     const policy = this.getActivePolicy(timeStr);
     this.readings.push({ apartmentId, decibel, timeStr });
 
-    // Cenário 1: Se abaixo do limiar de atenção, não faz nada
     if (decibel < policy.warningDb) {
       return { event: null, alert: null, status: 'normal' };
     }
 
     const severity = decibel >= policy.criticalDb ? 'critical' : 'warning';
 
-    // Agrupamento de evento
     let event = this.events.find(e => e.apartmentId === apartmentId);
     if (!event) {
       event = {
@@ -54,7 +44,6 @@ class NoiseEngineSimulator {
       if (severity === 'critical') event.severity = 'critical';
     }
 
-    // Alerta só é gerado se atingir a duração mínima
     let alert = null;
     if (event.durationSeconds >= policy.minDurationSec) {
       alert = {
@@ -71,9 +60,6 @@ class NoiseEngineSimulator {
   }
 }
 
-// ==============================================================================
-// EXECUÇÃO DOS CENÁRIOS DE TESTE
-// ==============================================================================
 console.log('===============================================================');
 console.log('   dBSound — EXECUÇÃO DA SUÍTE DE TESTES AUTOMATIZADOS');
 console.log('===============================================================\n');
@@ -81,7 +67,6 @@ console.log('===============================================================\n')
 let passedTests = 0;
 let totalTests = 45;
 
-// CENÁRIO 1: 40 dB — Não gerar alerta
 (() => {
   const engine = new NoiseEngineSimulator();
   const res = engine.processReading('apt-101', 40.0, '14:00');
@@ -93,12 +78,9 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 2: 65 dB — Classificar conforme política
 (() => {
   const engine = new NoiseEngineSimulator();
-  // Às 14h (diurno, limite 70 dB): 65 dB é normal
   const resDay = engine.processReading('apt-101', 65.0, '14:00');
-  // Às 23h (noturno, limite 60 dB): 65 dB é atenção (warning)
   const resNight = engine.processReading('apt-102', 65.0, '23:00');
 
   if (resDay.status === 'normal' && resNight.status === 'warning') {
@@ -109,10 +91,8 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 3: 95 dB durante poucos segundos (< duração mínima) — Não gerar alerta
 (() => {
   const engine = new NoiseEngineSimulator();
-  // 95 dB por 1 segundo
   const res = engine.processReading('apt-101', 95.0, '14:00', 1);
 
   if (engine.alerts.length === 0 && res.event !== null && res.event.durationSeconds < 3) {
@@ -123,10 +103,8 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 4: 95 dB durante período suficiente (> 3s) — Gerar reading -> event -> alert
 (() => {
   const engine = new NoiseEngineSimulator();
-  // Injeta leituras consecutivas até somar 4 segundos sustentados
   engine.processReading('apt-101', 94.0, '21:00', 1);
   engine.processReading('apt-101', 96.0, '21:00', 1);
   const resFinal = engine.processReading('apt-101', 95.5, '21:00', 2);
@@ -139,12 +117,10 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 5: Morador A tentando acessar apartamento B — ACESSO NEGADO (RLS)
 (() => {
   const mockUserA = { id: 'morador-101', apartmentId: 'apt-101', role: 'resident' };
   const targetApartmentId = 'apt-102';
 
-  // Regra RLS: role === 'resident' && targetApartmentId === user.apartmentId
   const canAccess = mockUserA.role === 'admin' || mockUserA.apartmentId === targetApartmentId;
 
   if (!canAccess) {
@@ -155,12 +131,10 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 6: Admin acessa seu condomínio — ACESSO PERMITIDO
 (() => {
   const mockAdmin = { id: 'admin-1', condominiumId: 'condo-1', role: 'admin' };
   const targetCondoId = 'condo-1';
 
-  // Regra RLS: role === 'admin' && targetCondoId === user.condominiumId
   const canAccess = mockAdmin.role === 'admin' && mockAdmin.condominiumId === targetCondoId;
 
   if (canAccess) {
@@ -171,7 +145,6 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 7: Fluxo de Alocação de Morador e Desbloqueio do App
 (() => {
   const pendingResident = {
     id: 'usr-new-001',
@@ -180,15 +153,12 @@ let totalTests = 45;
     apartment_number: undefined,
   };
 
-  // 1. Enquanto apartment_id for null, está pendente
   const isPendingInitial = !pendingResident.apartment_id;
 
-  // 2. Síndico aloca ao apartamento 202
   const allocatedApt = { id: '00000000-0000-0000-0000-000000000202', number: '202' };
   pendingResident.apartment_id = allocatedApt.id;
   pendingResident.apartment_number = allocatedApt.number;
 
-  // 3. Verifica se o acesso ao app é liberado imediatamente
   const isPendingAfter = !pendingResident.apartment_id;
   const canAccessAssignedApt = pendingResident.apartment_id === allocatedApt.id;
 
@@ -200,16 +170,15 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 8: Limite de Ruído Customizado por Unidade Sobrescrevendo Política Geral
 (() => {
   const condoPolicy = { warningDb: 60.0, criticalDb: 70.0 };
   const aptWithCustomThreshold = {
     id: 'apt-studio-301',
-    custom_night_threshold_db: 65.0, // Limite acústico mais tolerante para estúdio
+    custom_night_threshold_db: 65.0,
     custom_critical_threshold_db: 75.0,
   };
 
-  const currentReading = 62.0; // Superior a 60 dB da política geral, mas abaixo dos 65 dB da unidade
+  const currentReading = 62.0;
 
   const effectiveThreshold = aptWithCustomThreshold.custom_night_threshold_db ?? condoPolicy.warningDb;
   const isAboveThreshold = currentReading >= effectiveThreshold;
@@ -222,7 +191,6 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 9: Criação de Novo Apartamento on-the-fly na Alocação + Persistência Resiliente
 (() => {
   const localApartments = [
     { id: 'apt-101', number: '101', floor: 1, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80 }
@@ -235,14 +203,12 @@ let totalTests = 45;
     custom_critical_threshold_db: 82,
   };
 
-  // Simula criação e persistência
   const createdApt = {
     id: '00000000-0000-0000-0000-000000000502',
     ...newAptDto,
   };
   localApartments.push(createdApt);
 
-  // Simula alocação de morador novo
   const resident = { id: 'usr-new-999', name: 'Ana Moradora', role: 'resident', apartment_id: null, apartment_number: undefined };
   resident.apartment_id = createdApt.id;
   resident.apartment_number = createdApt.number;
@@ -258,7 +224,6 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 10: Auto-recuperação de morador alocado com acesso imediato (sem ficar preso em tela de espera)
 (() => {
   const localAllocations = {
     'usr-res-555': '00000000-0000-0000-0000-000000000502'
@@ -267,7 +232,6 @@ let totalTests = 45;
     { id: '00000000-0000-0000-0000-000000000502', number: '502' }
   ];
 
-  // Supabase simulado retornou apartment_id como null (ex: RLS bloqueou update no banco remoto)
   const supabaseProfile = {
     id: 'usr-res-555',
     email: 'novo.morador@condo.com',
@@ -275,7 +239,6 @@ let totalTests = 45;
     apartment_id: null,
   };
 
-  // Lógica inteligente de auto-recuperação do AuthContext
   const effectiveAptId = supabaseProfile.apartment_id || localAllocations[supabaseProfile.id] || null;
   const aptNumber = apts.find(a => a.id === effectiveAptId)?.number;
 
@@ -295,13 +258,11 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 11: Isolamento Multi-Inquilino (Apto 101 recebe ruído e alerta, Apto 102 permanece intocado)
 (() => {
   const apt101 = { id: 'apt-101', number: '101', current_db: 40.0, status: 'normal' };
   const apt102 = { id: 'apt-102', number: '102', current_db: 40.0, status: 'normal' };
   const allAlerts = [];
 
-  // Síndico injeta ruído sustentado no Apto 101
   const injectedReading = { apartment_id: 'apt-101', decibel: 95.0 };
   apt101.current_db = injectedReading.decibel;
   apt101.status = 'critical';
@@ -313,9 +274,7 @@ let totalTests = 45;
     read: false,
   });
 
-  // Morador do 101 consulta seus dados
   const morador101Alert = allAlerts.find(a => a.apartment_id === apt101.id && a.severity === 'critical' && !a.read);
-  // Morador do 102 consulta seus dados
   const morador102Alert = allAlerts.find(a => a.apartment_id === apt102.id && a.severity === 'critical' && !a.read);
 
   const isIsolated = apt101.current_db === 95.0 && 
@@ -332,15 +291,12 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 12: Regra de Debounce (Ruído pontual de 1s @ 95 dB atualiza medidor sem modal vs 3s sustentado)
 (() => {
   const engine = new NoiseEngineSimulator();
 
-  // Teste 1: Leitura única de 95 dB (1s)
   const res1 = engine.processReading('apt-101', 95.0, '14:00', 1);
   const singlePulsePassed = engine.alerts.length === 0 && res1.event !== null && res1.event.durationSeconds < 3;
 
-  // Teste 2: Continuação para acumular 3 segundos
   engine.processReading('apt-101', 95.0, '14:00', 1);
   const resFinal = engine.processReading('apt-101', 95.0, '14:00', 1);
   const sustainedPassed = engine.alerts.length > 0 && resFinal.alert && resFinal.alert.severity === 'critical';
@@ -353,9 +309,7 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 13: Alocação de Morador Pendente -> Status 'approved' e Desbloqueio da Tela de Espera
 (() => {
-  // Morador recém-cadastrado no banco Supabase (com status 'pending' inicial)
   const dbUser = {
     id: 'user-breno-123',
     email: 'breno@email.com',
@@ -365,20 +319,16 @@ let totalTests = 45;
     apartment_id: null
   };
 
-  // Verificação inicial: morador pendente DEVE cair na tela de espera
   const isBlockedInitially = !dbUser.apartment_id || dbUser.status === 'pending';
 
-  // Síndico aloca morador ao Apto 101
   const assignedAptId = '00000000-0000-0000-0000-000000000101';
   dbUser.apartment_id = assignedAptId;
 
-  // Lógica corrigida do AuthContext & DataService:
   const resolvedStatus = dbUser.apartment_id 
     ? (dbUser.status === 'blocked' ? 'blocked' : 'approved') 
     : (dbUser.status || 'pending');
   dbUser.status = resolvedStatus;
 
-  // Checagem de desbloqueio no ResidentMobileView
   const isBlockedAfter = !dbUser.apartment_id || dbUser.status === 'pending';
 
   if (isBlockedInitially && !isBlockedAfter && dbUser.status === 'approved') {
@@ -389,7 +339,6 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 14: Desvinculação de Morador -> Reversão para 'pending' e Retorno à Fila de Pendentes
 (() => {
   const resident = {
     id: 'user-victor-456',
@@ -400,13 +349,10 @@ let totalTests = 45;
     apartment_id: '00000000-0000-0000-0000-000000000101'
   };
 
-  // Síndico executa desvinculação
   resident.apartment_id = null;
   resident.status = 'pending';
 
-  // Verificação na visão do Síndico: morador volta a ser listado nos pendentes
   const isListedAsPending = !resident.apartment_id;
-  // Verificação no App do Morador: morador volta para tela de análise
   const isBlockedInMobile = !resident.apartment_id || resident.status === 'pending';
 
   if (isListedAsPending && isBlockedInMobile && resident.status === 'pending') {
@@ -417,7 +363,6 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 15: Troca de Unidade (Apto 101 -> Apto 102) sem Links Fantasmas
 (() => {
   const apt101 = { id: 'apt-101', number: '101' };
   const apt102 = { id: 'apt-102', number: '102' };
@@ -426,14 +371,11 @@ let totalTests = 45;
     { id: 'morador-1', full_name: 'Victor', apartment_id: 'apt-101', status: 'approved' }
   ];
 
-  // 1. No início, Victor está no 101
   const occ101Before = profiles.filter(p => p.apartment_id === apt101.id);
   const occ102Before = profiles.filter(p => p.apartment_id === apt102.id);
 
-  // 2. Síndico troca Victor para o Apto 102
   profiles[0].apartment_id = apt102.id;
 
-  // 3. Após a troca, Apto 101 DEVE ficar vago (0 moradores) e Apto 102 ocupado por Victor
   const occ101After = profiles.filter(p => p.apartment_id === apt101.id);
   const occ102After = profiles.filter(p => p.apartment_id === apt102.id);
 
@@ -451,7 +393,6 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 16: Isolamento Multi-Inquilino de Dois Moradores Reais (Morador A no 101, Morador B no 102)
 (() => {
   const profiles = [
     { id: 'victor-id', full_name: 'Victor', apartment_id: 'apt-101', role: 'resident', status: 'approved' },
@@ -467,12 +408,10 @@ let totalTests = 45;
     { id: 'alt-1', apartment_id: 'apt-101', severity: 'critical', title: 'Alerta Apto 101' },
   ];
 
-  // Morador Victor (Apto 101)
   const victorUser = profiles[0];
   const victorReadings = readings.filter(r => r.apartment_id === victorUser.apartment_id);
   const victorAlerts = alerts.filter(a => a.apartment_id === victorUser.apartment_id);
 
-  // Morador Breno (Apto 102)
   const brenoUser = profiles[1];
   const brenoReadings = readings.filter(r => r.apartment_id === brenoUser.apartment_id);
   const brenoAlerts = alerts.filter(a => a.apartment_id === brenoUser.apartment_id);
@@ -490,7 +429,6 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 17: Resolução Robusta de Status (Eliminação definitiva do curto-circuito "pending" || "approved")
 (() => {
   const resolveStatus = (dbStatus, effectiveAptId) => {
     return effectiveAptId 
@@ -498,10 +436,10 @@ let totalTests = 45;
       : (dbStatus || 'pending');
   };
 
-  const test1 = resolveStatus('pending', 'apt-101') === 'approved'; // Morador pendente alocado ao 101 vira approved
-  const test2 = resolveStatus('pending', null) === 'pending';       // Morador pendente sem apto continua pending
-  const test3 = resolveStatus('blocked', 'apt-101') === 'blocked';   // Morador explicitamente bloqueado não ganha approved
-  const test4 = resolveStatus(undefined, 'apt-101') === 'approved'; // Morador sem status no banco mas com apto vira approved
+  const test1 = resolveStatus('pending', 'apt-101') === 'approved';
+  const test2 = resolveStatus('pending', null) === 'pending';
+  const test3 = resolveStatus('blocked', 'apt-101') === 'blocked';
+  const test4 = resolveStatus(undefined, 'apt-101') === 'approved';
 
   if (test1 && test2 && test3 && test4) {
     console.log('✅ Cenário 17 [PASSOU]: Resolução de status validada para todas as combinações (sem curto-circuito de string truthy).');
@@ -511,7 +449,6 @@ let totalTests = 45;
   }
 })();
 
-// CENÁRIO 18: Morador A (Apto 101) cria Denúncia Anônima contra Apto 102
 let createdOccurrence = null;
 (() => {
   const reporterUser = { id: 'morador-101-id', full_name: 'Victor Mateus', apartment_id: 'apt-101' };
@@ -550,7 +487,6 @@ let createdOccurrence = null;
   }
 })();
 
-// CENÁRIO 19: Decisão do Síndico atualiza Ocorrência para 'procedente' com parecer regimental
 let auditComments = [];
 (() => {
   const syndicDecision = 'procedente';
@@ -582,10 +518,8 @@ let auditComments = [];
   }
 })();
 
-// CENÁRIO 20: Emissão de Multa Simulada com Provedor de Cobrança Fictícia (Boleto + PIX)
 let createdFine = null;
 (() => {
-  // Simula o SimulatedBillingProvider desacoplado
   const chargeParams = {
     amount: 500.00,
     description: `Multa por Infração Acústica — Apto ${createdOccurrence.apartment_number}`,
@@ -638,27 +572,22 @@ let createdFine = null;
   }
 })();
 
-// CENÁRIO 21: Isolamento Multi-Inquilino de Cobranças e Notificações (Morador 102 vs Morador 101)
 (() => {
   const allFines = [createdFine];
   const allOccurrences = [createdOccurrence];
 
-  // Morador do Apto 102 (Alvo da penalidade)
   const morador102Fines = allFines.filter(f => f.apartment_id === 'apt-102');
   const morador102Notices = allOccurrences.filter(o => o.apartment_id === 'apt-102');
 
-  // Morador do Apto 101 (Denunciante)
   const morador101Fines = allFines.filter(f => f.apartment_id === 'apt-101');
   const morador101Notices = allOccurrences.filter(o => o.apartment_id === 'apt-101');
 
-  // Morador 102 deve ver a multa e o aviso da sua unidade, MAS SEM NENHUM dado do denunciante
   const valid102 = morador102Fines.length === 1 && 
                    morador102Fines[0].amount === 500.00 &&
                    morador102Notices.length === 1 &&
                    morador102Notices[0].reporter_id === undefined &&
                    morador102Notices[0].anonymous === true;
 
-  // Morador 101 NÃO tem multa nem notificação contra sua unidade
   const valid101 = morador101Fines.length === 0 && morador101Notices.length === 0;
 
   if (valid102 && valid101) {
@@ -669,7 +598,6 @@ let createdFine = null;
   }
 })();
 
-// CENÁRIO 22: Simulação de Pagamento da Multa com Liquidação Fictícia
 (() => {
   const simulatedPayFine = (fine) => {
     const paidAt = new Date().toISOString();
@@ -690,13 +618,11 @@ let createdFine = null;
   }
 })();
 
-// Shared conversation and message state for test scenarios
 let occurrenceConversation = null;
 let occurrenceMessages = [];
 let preventiveConversation = null;
 let preventiveMessages = [];
 
-// CENÁRIO 23: Criação de Conversa Bidirecional vinculada à Ocorrência (type = 'ocorrencia')
 (() => {
   occurrenceConversation = {
     id: `conv-occ-${Date.now()}`,
@@ -726,9 +652,7 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 24: Envio e Recepção Bidirecional de Mensagens no Chat da Ocorrência
 (() => {
-  // 1. Síndico envia primeira mensagem de orientação
   const msgSyndic = {
     id: `msg-${Date.now()}-1`,
     conversation_id: occurrenceConversation.id,
@@ -742,7 +666,6 @@ let preventiveMessages = [];
   };
   occurrenceMessages.push(msgSyndic);
 
-  // 2. Morador do Apto 102 responde no thread
   const msgResident = {
     id: `msg-${Date.now()}-2`,
     conversation_id: occurrenceConversation.id,
@@ -770,18 +693,16 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 25: Contato Preventivo do Síndico iniciado diretamente pelo Monitoramento de Ruído (type = 'preventivo')
 (() => {
-  const occurrencesCountBefore = 1; // apenas a de teste anterior
+  const occurrencesCountBefore = 1;
   const totalOccurrencesInSystem = [createdOccurrence];
 
-  // Síndico detecta ruído elevado de 76 dB no Apto 103 e aciona "Contatar Morador"
   preventiveConversation = {
     id: `conv-prev-${Date.now()}`,
     condominium_id: '00000000-0000-0000-0000-000000000001',
     apartment_id: 'apt-103',
     apartment_number: '103',
-    occurrence_id: null, // NUNCA vincula a ocorrência
+    occurrence_id: null,
     type: 'preventivo',
     title: 'Aviso Preventivo de Ruído • Apto 103',
     subject: 'Aviso Preventivo de Ruído • Apto 103',
@@ -804,7 +725,6 @@ let preventiveMessages = [];
   };
   preventiveMessages.push(initialPrevMsg);
 
-  // Validação crítica: NENHUMA ocorrência foi adicionada ao sistema
   const valid = preventiveConversation.type === 'preventivo' &&
                 preventiveConversation.occurrence_id === null &&
                 preventiveConversation.apartment_id === 'apt-103' &&
@@ -818,7 +738,6 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 26: Diferenciação e Classificação Estrita de Tipos no Banco e UI (type = 'ocorrencia' vs type = 'preventivo')
 (() => {
   const allConversations = [occurrenceConversation, preventiveConversation];
 
@@ -838,17 +757,13 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 27: Central de Mensagens do Morador — Listagem e Isolamento Multi-Inquilino
 (() => {
   const allConversations = [occurrenceConversation, preventiveConversation];
 
-  // Morador do Apto 102 acessa sua Central de Mensagens
   const morador102Convs = allConversations.filter(c => c.apartment_id === 'apt-102');
 
-  // Morador do Apto 101 acessa sua Central de Mensagens
   const morador101Convs = allConversations.filter(c => c.apartment_id === 'apt-101');
 
-  // Morador do Apto 103 acessa sua Central de Mensagens
   const morador103Convs = allConversations.filter(c => c.apartment_id === 'apt-103');
 
   const valid = morador102Convs.length === 1 &&
@@ -865,12 +780,9 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 28: Controle e Limpeza de Badge de Mensagens Não Lidas (unread_count e read: false -> true)
 (() => {
-  // A mensagem do síndico para o morador 102 foi enviada com read: false
   const unreadBefore = occurrenceMessages.filter(m => !m.read && m.sender_role === 'syndic').length;
 
-  // Morador abre a conversa -> markMessagesAsRead
   occurrenceMessages.forEach(m => {
     if (m.sender_role === 'syndic') m.read = true;
   });
@@ -888,12 +800,10 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 29: Preservação Rigorosa do Anonimato do Denunciante no Chat e na Notificação
 (() => {
   const occ = createdOccurrence;
   const conv = occurrenceConversation;
 
-  // Morador do 102 consulta dados da ocorrência e conversa
   const dataForResident102 = {
     occurrence_id: occ.id,
     type: occ.type,
@@ -919,7 +829,6 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 30: Linha do Tempo / Histórico Cronológico Integrado da Ocorrência
 (() => {
   const timelineEvents = [
     { type: 'sensor_telemetry', db: 74.5, time: '2026-09-15T22:30:00Z', label: 'Telemetria Acústica Registrada' },
@@ -943,7 +852,6 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 31: Ação e Modal de Multa — Validação de Justificativa, Valor Configurável e Disclaimer de Simulação
 (() => {
   const fineProposal = {
     apartment_id: 'apt-102',
@@ -967,22 +875,18 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 32: Integridade Global do Sistema (Não-Regressão Total de Monitoramento, Alocação e Sensores)
 (() => {
   const engine = new NoiseEngineSimulator();
 
-  // 1. Monitoramento acústico e debounce de 3 segundos mantidos
   const readingShort = engine.processReading('apt-101', 90.0, '14:00', 1);
-  const readingLong = engine.processReading('apt-101', 90.0, '14:00', 2); // total 3s -> dispara alerta
+  const readingLong = engine.processReading('apt-101', 90.0, '14:00', 2);
 
   const debounceOk = readingShort.alert === null && readingLong.alert !== null;
 
-  // 2. Alocação e aprovação de moradores mantidas
   const testProfiles = [
     { id: 'u1', email: 'victor@dbsound.com', apartment_id: 'apt-101', is_approved: true },
     { id: 'u2', email: 'breno@dbsound.com', apartment_id: null, is_approved: false },
   ];
-  // Síndico aloca Breno no 102
   testProfiles[1].apartment_id = 'apt-102';
   testProfiles[1].is_approved = true;
 
@@ -996,16 +900,14 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 33: Reconstrução do Chat & Correção Definitiva do Histórico em Branco
 (() => {
-  // Simula dados retornados pelo Supabase onde a coluna no banco é 'message', mas o frontend aguarda 'content'
   const rawDbMessages = [
     {
       id: 'msg-raw-1',
       conversation_id: 'conv-test-1',
       sender_id: 'user-sindico',
       sender_name: 'Carlos Síndico',
-      sender_role: null, // coluna legada ausente
+      sender_role: null,
       message: 'Notificação acústica: volume excedeu 70 dB.',
       read: true,
       created_at: '2026-09-15T18:00:00Z',
@@ -1022,7 +924,6 @@ let preventiveMessages = [];
     }
   ];
 
-  // Pipeline de normalização do DataService.getMessages
   const normalizedMessages = rawDbMessages.map(m => {
     const text = m.content || m.message || '';
     const role = m.sender_role || (m.sender_name && m.sender_name.toLowerCase().includes('morador') ? 'resident' : 'syndic');
@@ -1034,7 +935,6 @@ let preventiveMessages = [];
     };
   });
 
-  // Validação: ambos os campos estão preenchidos, role está garantido e texto nunca é vazio
   const valid = normalizedMessages[0].content === 'Notificação acústica: volume excedeu 70 dB.' &&
                 normalizedMessages[0].message === 'Notificação acústica: volume excedeu 70 dB.' &&
                 normalizedMessages[0].sender_role === 'syndic' &&
@@ -1049,7 +949,6 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 34: Cancelamento de Multa com Auditoria Estrita (Sem DELETE, Status 'cancelada')
 (() => {
   const activeFine = {
     id: 'fine-cancel-test',
@@ -1067,7 +966,6 @@ let preventiveMessages = [];
   const finesDatabase = [activeFine];
   const auditLogs = [];
 
-  // Síndico executa cancelFine com justificativa formal
   const cancelDTO = {
     fine_id: 'fine-cancel-test',
     cancelled_by: 'Carlos Síndico Geral',
@@ -1090,7 +988,7 @@ let preventiveMessages = [];
     timestamp: target.cancelled_at,
   });
 
-  const valid = finesDatabase.length === 1 && // ZERO HARD DELETE
+  const valid = finesDatabase.length === 1 &&
                 target.status === 'cancelada' &&
                 target.previous_status === 'pendente' &&
                 target.cancellation_reason.includes('Acordo firmado') &&
@@ -1105,10 +1003,9 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 35: Isolamento de Impressão de Boleto Simulado (@media print e Layout Limpo)
 (() => {
   const printableAreaId = 'printable-boleto-area';
-  const hasPrintStylesheetRules = true; // @media print rules configuradas em index.css
+  const hasPrintStylesheetRules = true;
   const hasAcademicWatermark = true;
   const hasBarcodeInput = true;
   const hasPixPayload = true;
@@ -1127,7 +1024,6 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 36: Central de Mensagens do Síndico (/sindico/mensagens e Filtros)
 (() => {
   const allConversations = [
     { id: 'c1', type: 'preventivo', apartment_number: '101', unread_count: 0, status: 'aberta' },
@@ -1135,13 +1031,9 @@ let preventiveMessages = [];
     { id: 'c3', type: 'preventivo', apartment_number: '103', unread_count: 1, status: 'aberta' },
   ];
 
-  // Filtro 'Todas'
   const filterAll = allConversations;
-  // Filtro '🔴 Preventivas'
   const filterPrev = allConversations.filter(c => c.type === 'preventivo');
-  // Filtro '🟢 Ocorrências'
   const filterOcc = allConversations.filter(c => c.type === 'ocorrencia');
-  // Filtro 'Não Lidas'
   const filterUnread = allConversations.filter(c => (c.unread_count || 0) > 0);
 
   const totalUnreadCount = allConversations.reduce((acc, c) => acc + (c.unread_count || 0), 0);
@@ -1160,13 +1052,11 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 37: Reutilização de Conversa de Ocorrência (Prevenção de Duplicatas)
 (() => {
   const existingConvs = [
     { id: 'conv-occ-123', occurrence_id: 'occ-999', apartment_id: 'apt-201', type: 'ocorrencia' }
   ];
 
-  // Função simulada getOrCreateOccurrenceConversation
   function getOrCreateOccurrenceConversation(occId, aptId) {
     const found = existingConvs.find(c => c.occurrence_id === occId);
     if (found) return { conv: found, created: false };
@@ -1175,11 +1065,8 @@ let preventiveMessages = [];
     return { conv: created, created: true };
   }
 
-  // Primeiro clique em "Conversar com morador"
   const call1 = getOrCreateOccurrenceConversation('occ-999', 'apt-201');
-  // Segundo clique em "Conversar com morador"
   const call2 = getOrCreateOccurrenceConversation('occ-999', 'apt-201');
-  // Terceiro clique em "Conversar com morador"
   const call3 = getOrCreateOccurrenceConversation('occ-999', 'apt-201');
 
   const valid = call1.conv.id === 'conv-occ-123' &&
@@ -1197,7 +1084,6 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 38: Independência de Seleção das 4 Conversas (Sem Pulo/Reset para a 1ª Conversa)
 (() => {
   const seedConversations = [
     { id: '10100000-cccc-0000-0000-000000000101', apartment_number: '101', type: 'preventivo', subject: 'Atenção ao Nível Sonoro' },
@@ -1206,7 +1092,6 @@ let preventiveMessages = [];
     { id: '40200000-cccc-0000-0000-000000000402', apartment_number: '402', type: 'ocorrencia', subject: 'Reclamação de Ocorrência em Apuração' },
   ];
 
-  // Simulação fiel do estado com ref no MessagesManagementPage
   let selectedConversationId = null;
   const selectedConversationIdRef = { current: null };
   let isInitialMount = true;
@@ -1216,7 +1101,6 @@ let preventiveMessages = [];
     if (currentId) {
       const existing = convs.find(c => c.id === currentId);
       if (existing) {
-        // Mantém conversa ativa sem resetar!
         return existing.id;
       }
     }
@@ -1234,27 +1118,21 @@ let preventiveMessages = [];
     isInitialMount = false;
     selectedConversationIdRef.current = convId;
     selectedConversationId = convId;
-    // Simula evento assíncrono / subscription que dispara loadConversations()
     return loadConversations(seedConversations);
   }
 
-  // 1. Montagem inicial -> auto seleciona 101
   const initial = loadConversations(seedConversations);
   const okInitial = initial === seedConversations[0].id;
 
-  // 2. Usuário clica na conversa 2 (Apto 203)
   const afterClick2 = handleSelectConversation(seedConversations[1].id);
   const okClick2 = afterClick2 === seedConversations[1].id;
 
-  // 3. Usuário clica na conversa 3 (Apto 305)
   const afterClick3 = handleSelectConversation(seedConversations[2].id);
   const okClick3 = afterClick3 === seedConversations[2].id;
 
-  // 4. Usuário clica na conversa 4 (Apto 402)
   const afterClick4 = handleSelectConversation(seedConversations[3].id);
   const okClick4 = afterClick4 === seedConversations[3].id;
 
-  // 5. Retorna para conversa 2 (Apto 203)
   const returnTo2 = handleSelectConversation(seedConversations[1].id);
   const okReturn = returnTo2 === seedConversations[1].id;
 
@@ -1266,7 +1144,6 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 39: Identidade Estrita do Remetente (Sem Inversão de Lados no Chat)
 (() => {
   const syndicUser = { id: 'sindico-uuid-0001', role: 'syndic', full_name: 'Síndico Geral' };
   const residentUser = { id: 'morador-uuid-0101', role: 'resident', full_name: 'João Silva' };
@@ -1291,18 +1168,16 @@ let preventiveMessages = [];
     created_at: new Date().toISOString()
   };
 
-  // Avaliação na visão do Síndico
   const syndicView_isMe_ResidentMsg = syndicUser.id ? messageFromResident.sender_id === syndicUser.id : false;
   const syndicView_isMe_SyndicMsg = syndicUser.id ? messageFromSyndic.sender_id === syndicUser.id : false;
 
-  // Avaliação na visão do Morador
   const residentView_isMe_ResidentMsg = residentUser.id ? messageFromResident.sender_id === residentUser.id : false;
   const residentView_isMe_SyndicMsg = residentUser.id ? messageFromSyndic.sender_id === residentUser.id : false;
 
-  const valid = (syndicView_isMe_ResidentMsg === false) && // mensagem do morador NÃO é "Você" para o síndico
-                (syndicView_isMe_SyndicMsg === true) &&    // mensagem do síndico É "Você" para o síndico
-                (residentView_isMe_ResidentMsg === true) && // mensagem do morador É "Você" para o morador
-                (residentView_isMe_SyndicMsg === false);   // mensagem do síndico NÃO é "Você" para o morador
+  const valid = (syndicView_isMe_ResidentMsg === false) &&
+                (syndicView_isMe_SyndicMsg === true) &&
+                (residentView_isMe_ResidentMsg === true) &&
+                (residentView_isMe_SyndicMsg === false);
 
   if (valid) {
     console.log('✅ Cenário 39 [PASSOU]: Identidade Estrita de Remetente (sender_id === currentUser.id): Mensagens de moradores e síndico posicionadas e rotuladas corretamente.');
@@ -1312,7 +1187,6 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 40: Estabilidade do Status de Leitura (Sem Flickering e Notificação Condicional)
 (() => {
   let notifyCalls = 0;
   const mockLocalStore = {
@@ -1329,7 +1203,6 @@ let preventiveMessages = [];
   function markMessagesAsRead(convId, userId) {
     let hasChanged = false;
     mockMessages = mockMessages.map(m => {
-      // Marca como lida apenas se o destinatário for o usuário atual e ainda estiver como não lida
       if ((m.recipient_id === userId || (m.sender_id !== userId && userId)) && !m.read) {
         hasChanged = true;
         return { ...m, read: true };
@@ -1337,21 +1210,17 @@ let preventiveMessages = [];
       return m;
     });
 
-    // CRÍTICO: Só notifica se algo REALMENTE mudou
     if (hasChanged) {
       mockLocalStore.notify();
     }
   }
 
-  // 1ª Execução: m1 está não-lida -> deve marcar como lida e notificar UMA vez
   markMessagesAsRead('conv-01', currentUserId);
   const notifyCount1 = notifyCalls;
 
-  // 2ª Execução consecutiva (ex: render cycle ou heartbeat): nada mudou -> NÃO deve notificar
   markMessagesAsRead('conv-01', currentUserId);
   const notifyCount2 = notifyCalls;
 
-  // Status visual para mensagem enviada por mim:
   const sentMsgUnreadStatus = mockMessages[2].read ? '✓✓ Visualizada' : '✓ Enviada';
   const valid = notifyCount1 === 1 && notifyCount2 === 1 && sentMsgUnreadStatus === '✓ Enviada';
 
@@ -1363,15 +1232,12 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 41: Layout CSS Grid Anti-Sobreposição da Sidebar e Proteção de Conteúdo
 (() => {
-  // Definição da arquitetura de Grid no SindicoLayout
   const layoutContainerClass = 'grid h-screen w-screen bg-space-950 text-slate-100 overflow-hidden grid-cols-[16rem_minmax(0,1fr)]';
   const sidebarClass = 'w-64 h-full shrink-0 bg-space-900/95 border-r border-white/10 flex flex-col justify-between select-none z-30';
   const headerClass = 'shrink-0 w-full px-6 md:px-8 border-b border-white/10 bg-space-900/50 backdrop-blur-md';
   const pageClass = 'w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 animate-fadeIn';
 
-  // Validação das propriedades estruturais
   const hasStrictGridCols = layoutContainerClass.includes('grid-cols-[16rem_minmax(0,1fr)]');
   const hasFixedSidebarWidth = sidebarClass.includes('w-64');
   const hasShrinkZeroHeader = headerClass.includes('shrink-0');
@@ -1387,9 +1253,7 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 42: Chat Bidirecional em Tempo Real sem F5 (Eventos INSERT / UPDATE)
 (() => {
-  // Simula o mecanismo de escuta de eventos em tempo real
   const listeners = [];
   const subscribeToChatRealtime = (fn) => {
     listeners.push(fn);
@@ -1406,7 +1270,6 @@ let preventiveMessages = [];
   let sindicoMessages = [];
   let moradorMessages = [];
 
-  // Síndico se inscreve
   const unsubSindico = subscribeToChatRealtime((evt) => {
     if (evt.type === 'INSERT' && evt.message) {
       if (!sindicoMessages.some(m => m.id === evt.message.id)) {
@@ -1415,7 +1278,6 @@ let preventiveMessages = [];
     }
   });
 
-  // Morador se inscreve
   const unsubMorador = subscribeToChatRealtime((evt) => {
     if (evt.type === 'INSERT' && evt.message) {
       if (!moradorMessages.some(m => m.id === evt.message.id)) {
@@ -1424,7 +1286,6 @@ let preventiveMessages = [];
     }
   });
 
-  // 1. Morador envia mensagem
   const msgFromResident = {
     id: 'msg-uuid-001',
     conversation_id: 'conv-101',
@@ -1437,7 +1298,6 @@ let preventiveMessages = [];
   };
   dispatchEvent({ type: 'INSERT', message: msgFromResident });
 
-  // 2. Síndico responde
   const msgFromSyndic = {
     id: 'msg-uuid-002',
     conversation_id: 'conv-101',
@@ -1467,7 +1327,6 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 43: Preservação de Estado entre Múltiplas Conversas (101, 203, 305, 402) e Deduplicação por ID
 (() => {
   const conversations = [
     { id: 'c-101', apt: '101', last_message: 'Mensagem inicial 101', unread_count: 0 },
@@ -1476,12 +1335,11 @@ let preventiveMessages = [];
     { id: 'c-402', apt: '402', last_message: 'Mensagem inicial 402', unread_count: 0 },
   ];
 
-  let selectedConvId = 'c-203'; // Usuário está com o Apto 203 selecionado
+  let selectedConvId = 'c-203';
   let activeMessages = [
     { id: 'm-203-1', conversation_id: 'c-203', message: 'Olá 203' }
   ];
 
-  // Chega mensagem para a conversa 'c-402' (NÃO ativa)
   const incomingNonActive = {
     id: 'm-402-1',
     conversation_id: 'c-402',
@@ -1491,7 +1349,6 @@ let preventiveMessages = [];
   if (incomingNonActive.conversation_id === selectedConvId) {
     activeMessages.push(incomingNonActive);
   } else {
-    // Atualiza apenas a prévia da conversa em background SEM mudar a seleção
     const target = conversations.find(c => c.id === incomingNonActive.conversation_id);
     if (target) {
       target.last_message = incomingNonActive.message;
@@ -1499,7 +1356,6 @@ let preventiveMessages = [];
     }
   }
 
-  // Chega mensagem para a conversa 'c-203' (ATIVA)
   const incomingActive = {
     id: 'm-203-2',
     conversation_id: 'c-203',
@@ -1511,15 +1367,14 @@ let preventiveMessages = [];
     }
   }
 
-  // Tenta inserir a mesma mensagem repetida (deduplicação por ID)
   if (incomingActive.conversation_id === selectedConvId) {
     if (!activeMessages.some(m => m.id === incomingActive.id)) {
       activeMessages.push(incomingActive);
     }
   }
 
-  const valid = selectedConvId === 'c-203' && // Seleção permaneceu em 203 (não resetou para 101)
-                activeMessages.length === 2 && // Deduplicação impediu duplicatas
+  const valid = selectedConvId === 'c-203' &&
+                activeMessages.length === 2 &&
                 conversations.find(c => c.id === 'c-402').unread_count === 1 &&
                 conversations.find(c => c.id === 'c-402').last_message === 'Nova dúvida do apto 402';
 
@@ -1531,7 +1386,6 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 44: Marcadores Atômicos read_at e Transição "✓ Enviada" -> "✓✓ Visualizada"
 (() => {
   const currentUserId = 'user-syndic';
   const msgSent = {
@@ -1547,15 +1401,12 @@ let preventiveMessages = [];
     return msg.read_at ? '✓✓ Visualizada' : '✓ Enviada';
   };
 
-  // Antes da leitura pelo destinatário
   const receipt1 = getReceipt(msgSent, true);
 
-  // Destinatário lê a mensagem (atualização com timestamp atômico read_at)
   const readTimestamp = new Date().toISOString();
   msgSent.read = true;
   msgSent.read_at = readTimestamp;
 
-  // Após a leitura pelo destinatário
   const receipt2 = getReceipt(msgSent, true);
 
   const valid = receipt1 === '✓ Enviada' && 
@@ -1571,7 +1422,6 @@ let preventiveMessages = [];
   }
 })();
 
-// CENÁRIO 45: Reconstrução da Tela de Ocorrências (Cards 100%, Abas Horizontais e Rota Dedicada de Boleto)
 (() => {
   const requiredTabs = ['all', 'em análise', 'procedente', 'improcedente', 'advertência', 'multa', 'resolvida'];
   const testOccurrence = {
@@ -1584,11 +1434,9 @@ let preventiveMessages = [];
     description: 'Som mecânico com batidas graves excessivas após as 22h.'
   };
 
-  // Validação das ações diretas do card
   const cardActions = ['Chat', 'Advertência', 'Multa', 'Ver detalhes'];
   const hasAllActions = cardActions.length === 4;
 
-  // Validação da rota dedicada para boletos
   const fineId = 'fine-sim-uuid-001';
   const boletoRoute = `/boleto/${fineId}`;
   const isDedicatedRoute = boletoRoute.startsWith('/boleto/');

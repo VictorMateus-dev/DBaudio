@@ -25,7 +25,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
 
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto">
-      {/* Page Title & Search Bar */}
+      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Planta Geral dos Apartamentos</h1>
@@ -34,9 +34,9 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
           </p>
         </div>
 
-        {/* Filter Controls */}
+        
         <div className="flex flex-wrap items-center gap-3">
-          {/* Search Box */}
+          
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -48,7 +48,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
             />
           </div>
 
-          {/* Status Filter */}
+          
           <div className="flex items-center space-x-1 bg-slate-900 border border-slate-800 rounded-lg p-1 text-xs">
             <button
               onClick={() => setFilterStatus('all')}
@@ -96,7 +96,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
         </div>
       </div>
 
-      {/* Interactive Floor Plan Grid */}
+      
       <FloorPlanGrid
         apartments={filteredApartments}
         onSelectApartment={onSelectApartment}

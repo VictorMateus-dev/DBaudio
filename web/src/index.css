@@ -10,7 +10,6 @@
   }
 }
 
-/* Vaultflow Glassmorphism & Glow Utilities */
 .vault-card {
   background: rgba(14, 15, 30, 0.7);
   backdrop-filter: blur(16px);
@@ -39,7 +38,6 @@
   background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.5), transparent);
 }
 
-/* Custom modern scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -58,7 +56,6 @@
   background: #8b5cf6;
 }
 
-/* Pulse radar effect for high noise */
 @keyframes radar-pulse {
   0% {
     transform: scale(0.95);
@@ -78,11 +75,6 @@
   animation: radar-pulse 1.8s infinite;
 }
 
-/* ==========================================================================
-   ESTILOS DEDICADOS PARA IMPRESSÃO EXCLUSIVA DO BOLETO FICTÍCIO
-   Garante que SOMENTE o elemento #printable-boleto-area seja impresso,
-   ocultando 100% de sidebar, navbar, fundos escuros, menus e outros elementos.
-   ========================================================================== */
 @media print {
   @page {
     size: A4 portrait;
@@ -94,12 +86,10 @@
     color: #000000 !important;
   }
 
-  /* Oculta toda a aplicação */
   body * {
     visibility: hidden !important;
   }
 
-  /* Torna visível estritamente o contêiner do boleto fictício */
   #printable-boleto-area,
   #printable-boleto-area * {
     visibility: visible !important;

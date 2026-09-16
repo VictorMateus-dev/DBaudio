@@ -69,7 +69,7 @@ export interface Sensor {
   id: string;
   device_id: string;
   name: string;
-  position: string; // Sala, Quarto, Cozinha
+  position: string;
   channel: number;
   enabled: boolean;
   created_at: string;

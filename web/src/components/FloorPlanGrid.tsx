@@ -15,7 +15,6 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
   selectedApartmentId,
   onPreventiveContact,
 }) => {
-  // Organizar andares dinamicamente com base nos apartamentos cadastrados
   const detectedFloors = Array.from(new Set(apartments.map(a => a.floor || 1))).sort((a, b) => b - a);
   const floors = detectedFloors.length > 0 ? detectedFloors : [1];
 
@@ -47,7 +46,7 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Legenda Explicativa */}
+      
       <div className="flex flex-wrap items-center gap-6 bg-slate-900/60 border border-slate-800 rounded-xl p-4 text-xs">
         <span className="font-semibold text-slate-300">Legenda da Planta:</span>
         <div className="flex items-center gap-2 text-slate-300">
@@ -68,7 +67,7 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
         </div>
       </div>
 
-      {/* Grid Organizado por Andar */}
+      
       <div className="space-y-4">
         {floors.map((floor) => {
           const floorApartments = apartments.filter(a => a.floor === floor || a.number.startsWith(String(floor)));
@@ -99,7 +98,7 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
                         isSelected ? 'ring-2 ring-blue-500 shadow-xl' : 'hover:scale-[1.01]'
                       }`}
                     >
-                      {/* Top Header of Card */}
+                      
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-2">
                           <span className="font-bold text-lg text-white font-mono tracking-tight">
@@ -109,7 +108,7 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
                         {getStatusBadge(apt.status)}
                       </div>
 
-                      {/* Noise Meter Display */}
+                      
                       <div className="my-3">
                         {isOffline ? (
                           <div className="flex items-center space-x-2 text-slate-500 py-2">
@@ -127,7 +126,7 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
                               </span>
                             </div>
 
-                            {/* Progress bar representing sound level */}
+                            
                             <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all duration-500 ${
@@ -144,7 +143,7 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
                         )}
                       </div>
 
-                      {/* Action trigger & Custom Limits */}
+                      
                       <div className="pt-2.5 border-t border-white/5 space-y-1.5 text-xs text-slate-400">
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="flex items-center gap-1 text-slate-400">

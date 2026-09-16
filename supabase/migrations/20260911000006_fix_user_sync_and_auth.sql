@@ -1,9 +1,3 @@
--- =====================================================================
--- dBSound: Migration 006 — Sincronização Automática de Usuários do Auth,
--- Liberação de RLS para Criação de Perfis e Resolução Definitiva de Alocação
--- =====================================================================
-
--- 1. GARANTIR CONDOMÍNIO E BLOCO PADRÃO (Impede erros de Foreign Key)
 INSERT INTO public.condominiums (id, name, address)
 VALUES ('00000000-0000-0000-0000-000000000001'::UUID, 'Residencial dBSound', 'Av. das Nações Unidas, 1000')
 ON CONFLICT (id) DO NOTHING;
@@ -11,16 +5,11 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.buildings (id, condominium_id, name)
 VALUES ('00000000-0000-0000-0000-000000000002'::UUID, '00000000-0000-0000-0000-000000000001'::UUID, 'Bloco Principal')
 ON CONFLICT (id) DO NOTHING;
-
--- 2. REMOVER CONSTRAINTS OBSOLETAS QUE IMPEDIAM RESIDENTES SEM APARTAMENTO
 ALTER TABLE public.profiles 
     DROP CONSTRAINT IF EXISTS chk_resident_apartment;
 
 ALTER TABLE public.profiles 
     DROP CONSTRAINT IF EXISTS chk_resident_apartment_flexible;
-
--- 3. PERMISSÕES E POLÍTICAS DE RLS COMPLETAS PARA PROFILES
--- Permite leitura, inserção, atualização e deleção para clientes autenticados e anônimos (evita erro 42501)
 DROP POLICY IF EXISTS "Permitir leitura de perfis" ON public.profiles;
 DROP POLICY IF EXISTS "Permitir insercao de perfis" ON public.profiles;
 DROP POLICY IF EXISTS "Permitir criacao de perfis" ON public.profiles;
@@ -40,16 +29,11 @@ CREATE POLICY "Permitir remocao de perfis" ON public.profiles
     FOR DELETE USING (true);
 
 GRANT ALL ON public.profiles TO anon, authenticated, service_role;
-
--- 4. FUNÇÃO RPC DE SINCRONIZAÇÃO COMPLETA: AUTH.USERS -> PUBLIC.PROFILES
--- Essa função varre todos os usuários cadastrados na autenticação do Supabase (inclusive os já existentes como Breno e Victor)
--- e garante que TODOS tenham seu respectivo perfil em public.profiles, pronto para o síndico visualizar e alocar!
 CREATE OR REPLACE FUNCTION public.sync_and_get_all_profiles()
 RETURNS SETOF public.profiles AS $$
 DECLARE
     v_condo_id UUID;
 BEGIN
-    -- Seleciona ou cria o condomínio padrão
     SELECT id INTO v_condo_id FROM public.condominiums ORDER BY created_at ASC LIMIT 1;
     IF v_condo_id IS NULL THEN
         v_condo_id := '00000000-0000-0000-0000-000000000001'::UUID;
@@ -57,8 +41,6 @@ BEGIN
         VALUES (v_condo_id, 'Residencial dBSound', 'Av. das Nações Unidas, 1000')
         ON CONFLICT (id) DO NOTHING;
     END IF;
-
-    -- Sincroniza qualquer usuário que esteja em auth.users mas não tenha profile
     INSERT INTO public.profiles (
         id,
         full_name,
@@ -93,15 +75,11 @@ BEGIN
         full_name = COALESCE(public.profiles.full_name, EXCLUDED.full_name),
         phone = COALESCE(public.profiles.phone, EXCLUDED.phone),
         updated_at = now();
-
-    -- Retorna todos os perfis ordenados pelos mais recentes
     RETURN QUERY 
     SELECT * FROM public.profiles 
     ORDER BY created_at DESC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 5. TRIGGER DEFINITIVO EM AUTH.USERS
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -153,7 +131,5 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- 6. PERMISSÕES DE EXECUÇÃO
 GRANT EXECUTE ON FUNCTION public.sync_and_get_all_profiles() TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.handle_new_user() TO anon, authenticated, service_role;

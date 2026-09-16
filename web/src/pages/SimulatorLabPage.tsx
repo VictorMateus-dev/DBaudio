@@ -41,14 +41,12 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
 
   const simulationIntervalRef = useRef<any>(null);
 
-  // Garante que o apartamento selecionado seja preenchido assim que a lista de apartamentos carregar
   useEffect(() => {
     if ((!selectedAptId || !apartments.some(a => a.id === selectedAptId)) && apartments.length > 0) {
       setSelectedAptId(initialApartmentId || apartments[0].id);
     }
   }, [apartments, initialApartmentId, selectedAptId]);
 
-  // Quick preset buttons
   const presets = [
     { label: '40 dB (Silêncio)', value: 40, desc: 'Ambiente tranquilo / biblioteca' },
     { label: '65 dB (Conversa)', value: 65, desc: 'Conversa normal / TV moderada' },
@@ -80,7 +78,6 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
     setIsSimulating(true);
 
     simulationIntervalRef.current = setInterval(() => {
-      // Pequena variação acústica natural (+/- 2 dB) em torno do valor selecionado
       const jitter = (Math.random() - 0.5) * 3;
       const readingDb = Math.max(30, Math.min(110, decibelValue + jitter));
 
@@ -96,14 +93,12 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
     setIsSimulating(false);
   };
 
-  // Testes Rápidos Prontos (Cenários Práticos)
   const testCriticalAlert = async () => {
     stopContinuousSimulation();
     const targetApt = selectedApartment;
     if (!targetApt) return;
     setLastFeedback(`Iniciando Teste de Alerta Crítico (95 dB sustentado por 5s no Apto ${targetApt.number})...`);
     
-    // Injeta 3 leituras consecutivas para ultrapassar a duração mínima de 3s (debounce window)
     await handleInjectSingle(94.0);
     setTimeout(() => handleInjectSingle(96.5), 1200);
     setTimeout(() => {
@@ -137,7 +132,7 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
 
   return (
     <div className="p-8 space-y-8 max-w-6xl mx-auto">
-      {/* Page Header */}
+      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-3 mb-1">
@@ -163,7 +158,7 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
         </button>
       </div>
 
-      {/* Feedbacks */}
+      
       {cleanFeedback && (
         <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
@@ -179,7 +174,7 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Form: Selectors & Sliders (2 Cols) */}
+        
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
@@ -187,7 +182,7 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
               Parâmetros da Injeção de Ruído
             </h3>
 
-            {/* Selectors Grid */}
+            
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div>
                 <label className="block text-slate-400 font-medium mb-1.5">Apartamento Alvo</label>
@@ -230,7 +225,7 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
               </div>
             </div>
 
-            {/* Quick Buttons */}
+            
             <div>
               <label className="block text-slate-400 font-medium mb-2 text-xs">
                 Botões Rápidos de Nível Sonoro
@@ -256,7 +251,7 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
               </div>
             </div>
 
-            {/* Slider de Intensidade Customizada */}
+            
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-medium text-slate-300">Intensidade Customizada (dB SPL):</label>
@@ -285,7 +280,7 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
               </div>
             </div>
 
-            {/* Continuous Controls */}
+            
             <div className="flex items-center gap-4 pt-4 border-t border-slate-800">
               {!isSimulating ? (
                 <button
@@ -315,7 +310,7 @@ export const SimulatorLabPage: React.FC<SimulatorLabPageProps> = ({
           </div>
         </div>
 
-        {/* Right Card: Quick Automation Scenarios (1 Col) */}
+        
         <div className="space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">

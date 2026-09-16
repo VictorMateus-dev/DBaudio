@@ -45,7 +45,6 @@ fun HighNoiseAlertModal(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Warning Icon
                 Icon(
                     imageVector = Icons.Default.Warning,
                     contentDescription = null,
@@ -72,7 +71,6 @@ fun HighNoiseAlertModal(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // dB Highlight Box
                 Box(
                     modifier = Modifier
                         .background(Color(0xFF090D16), RoundedCornerShape(16.dp))
@@ -125,7 +123,6 @@ fun HighNoiseAlertModal(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Action Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)

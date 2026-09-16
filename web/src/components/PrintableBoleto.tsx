@@ -42,12 +42,12 @@ export const PrintableBoleto: React.FC<PrintableBoletoProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
       <div className="w-full max-w-2xl my-8">
-        {/* Printable Area - ID selecionado pelas regras @media print */}
+        
         <div 
           id="printable-boleto-area" 
           className="bg-white text-slate-900 rounded-3xl p-6 md:p-8 space-y-5 shadow-2xl relative border-2 border-slate-300"
         >
-          {/* Tarja de Advertência e Simulação no Topo */}
+          
           <div className="border-b-2 border-dashed border-red-400 pb-3 text-center">
             <div className="inline-block px-3 py-1 rounded bg-red-100 text-red-700 font-mono text-xs font-black uppercase tracking-widest border border-red-300">
               ⚠️ DOCUMENTO DE COBRANÇA SIMULADO — SEM VALIDADE FINANCEIRA
@@ -57,7 +57,7 @@ export const PrintableBoleto: React.FC<PrintableBoletoProps> = ({
             </p>
           </div>
 
-          {/* Header do Beneficiário e Número */}
+          
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b pb-4">
             <div>
               <div className="flex items-center gap-2">
@@ -89,7 +89,7 @@ export const PrintableBoleto: React.FC<PrintableBoletoProps> = ({
             </div>
           </div>
 
-          {/* Banner de Cancelamento se a multa foi cancelada */}
+          
           {isCancelled && (
             <div className="p-3 rounded-xl bg-red-50 border-2 border-red-300 text-red-800 text-xs space-y-1">
               <div className="font-bold flex items-center gap-1.5 uppercase tracking-wide">
@@ -106,7 +106,7 @@ export const PrintableBoleto: React.FC<PrintableBoletoProps> = ({
             </div>
           )}
 
-          {/* Ficha de Dados da Cobrança */}
+          
           <div className="space-y-3 text-xs">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 font-mono">
               <div>
@@ -137,14 +137,14 @@ export const PrintableBoleto: React.FC<PrintableBoletoProps> = ({
               )}
             </div>
 
-            {/* Linha Digitável e Código de Barras Fictício */}
+            
             <div className="space-y-2 pt-2 border-t border-slate-200">
               <div className="flex items-center justify-between text-[11px] font-mono bg-slate-100 p-2.5 rounded-lg border border-slate-300 select-all">
                 <span className="font-bold text-slate-800 tracking-wider break-all">{fine.barcode}</span>
                 <span className="text-[9px] text-slate-500 uppercase shrink-0 ml-2">Linha Digitável Fictícia</span>
               </div>
 
-              {/* Código de barras estilizado com texto demonstrativo */}
+              
               <div className="p-4 bg-white border border-slate-300 rounded-lg flex flex-col items-center justify-center space-y-1">
                 <div className="flex items-center gap-[2px] h-12 w-full max-w-md justify-center">
                   {Array.from({ length: 55 }).map((_, i) => (
@@ -161,7 +161,7 @@ export const PrintableBoleto: React.FC<PrintableBoletoProps> = ({
               </div>
             </div>
 
-            {/* Rodapé Legal com Declaração Obrigatória */}
+            
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-800 space-y-0.5">
               <strong className="block font-bold">AVISO LEGAL OBRIGATÓRIO:</strong>
               <p>
@@ -170,7 +170,7 @@ export const PrintableBoleto: React.FC<PrintableBoletoProps> = ({
             </div>
           </div>
 
-          {/* Botões de Ação na Tela (Ocultados na Impressão via classe no-print) */}
+          
           <div className="no-print flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"

@@ -9,19 +9,16 @@ export const LoginPage: React.FC = () => {
   const { login, signUp, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
 
-  // Login form state
   const [loginEmail, setLoginEmail] = useState('admin@dbsound.com');
   const [loginPassword, setLoginPassword] = useState('Admin@123456');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Signup form state
   const [fullName, setFullName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // UI status feedback
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successInfo, setSuccessInfo] = useState<{ title: string; message: string; needsConfirmation: boolean } | null>(null);
 
@@ -74,7 +71,6 @@ export const LoginPage: React.FC = () => {
         message: res.message || 'Cadastro realizado. Verifique seu e-mail para ativar.',
         needsConfirmation: Boolean(res.needsConfirmation),
       });
-      // Limpar formulário de cadastro
       setFullName('');
       setSignupEmail('');
       setPhone('');
@@ -101,7 +97,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Password strength calculation
   const getPasswordStrength = (pass: string) => {
     if (!pass) return 0;
     let score = 0;
@@ -119,13 +114,13 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-space-950 text-slate-100 flex flex-col justify-center items-center p-4 relative overflow-hidden">
-      {/* Vaultflow Atmospheric Glow Background */}
+      
       <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-gradient-to-b from-violet-600/20 via-purple-600/10 to-transparent blur-[120px] pointer-events-none" />
       <div className="absolute -bottom-40 -left-20 w-[450px] h-[450px] bg-blue-600/10 blur-[130px] pointer-events-none" />
       <div className="absolute top-1/3 -right-20 w-[400px] h-[400px] bg-fuchsia-600/10 blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-md space-y-7 relative z-10">
-        {/* Brand Header */}
+        
         <div className="text-center space-y-3">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-300 text-xs font-medium backdrop-blur-md shadow-[0_0_15px_rgba(139,92,246,0.15)]">
             <Sparkles className="w-3.5 h-3.5 text-violet-400" />
@@ -145,9 +140,9 @@ export const LoginPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Main Vaultflow Glass Card */}
+        
         <div className="vault-card vault-border-glow rounded-3xl p-7 shadow-glass-card space-y-6">
-          {/* Tabs Selector */}
+          
           <div className="grid grid-cols-2 p-1 bg-space-900/90 border border-white/5 rounded-2xl">
             <button
               type="button"
@@ -173,7 +168,7 @@ export const LoginPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Quick Demo Fillers */}
+          
           {activeTab === 'login' && (
             <div className="flex items-center justify-between text-[11px] bg-white/[0.02] border border-white/[0.05] p-2.5 rounded-xl">
               <span className="text-slate-400 font-medium">Acessos Rápidos:</span>
@@ -203,7 +198,7 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* Feedback: Error Alert */}
+          
           {errorMsg && (
             <div className="flex items-start gap-2.5 p-3.5 bg-red-500/10 border border-red-500/25 rounded-2xl text-xs text-red-300 animate-fadeIn">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
@@ -211,7 +206,7 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* Feedback: Success Alert / Email confirmation message */}
+          
           {successInfo && (
             <div className="p-4 bg-violet-950/40 border border-violet-500/40 rounded-2xl space-y-2 text-xs animate-fadeIn">
               <div className="flex items-center gap-2 text-violet-300 font-semibold">
@@ -227,7 +222,7 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* TAB 1: LOGIN FORM */}
+          
           {activeTab === 'login' && (
             <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
               <div className="space-y-1.5">
@@ -291,7 +286,7 @@ export const LoginPage: React.FC = () => {
             </form>
           )}
 
-          {/* TAB 2: SIGNUP FORM */}
+          
           {activeTab === 'signup' && (
             <form onSubmit={handleSignUpSubmit} className="space-y-3.5 text-xs">
               <div className="space-y-1.5">
@@ -352,7 +347,7 @@ export const LoginPage: React.FC = () => {
                     required
                   />
                 </div>
-                {/* Strength Meter */}
+                
                 {signupPassword && (
                   <div className="space-y-1 pt-1">
                     <div className="flex h-1 gap-1">
@@ -387,7 +382,7 @@ export const LoginPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Informative Note */}
+              
               <div className="flex items-start gap-2 p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-[11px] text-violet-300">
                 <Building2 className="w-4 h-4 shrink-0 text-violet-400 mt-0.5" />
                 <span>
@@ -412,7 +407,7 @@ export const LoginPage: React.FC = () => {
             </form>
           )}
 
-          {/* Privacy & LGPD Seal */}
+          
           <div className="pt-4 border-t border-white/5 flex items-center justify-center gap-2 text-[11px] text-slate-500">
             <ShieldCheck className="w-4 h-4 text-violet-400" />
             <span>Auditoria Criptografada • Proteção LGPD (Sem gravação de áudio)</span>

@@ -46,10 +46,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const openOccurrencesCount = occurrences.filter(o => o.status === 'aberta' || o.status === 'em análise').length;
   const criticalEventsCount = apartments.filter(a => a.status === 'critical').length;
   
-  // Calcular maior pico registrado
   const highestPeak = Math.max(...apartments.map(a => a.peak_db || 0), 0);
 
-  // Modal de Contato Preventivo
   const [preventiveModalApartment, setPreventiveModalApartment] = useState<Apartment | null>(null);
   const [preventiveSubject, setPreventiveSubject] = useState('');
   const [preventiveMessage, setPreventiveMessage] = useState('');
@@ -88,7 +86,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      {/* Page Header */}
+      
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Painel de Monitoramento Síndico</h1>
@@ -108,7 +106,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* Notificação de Sucesso de Contato Preventivo */}
+      
       {preventiveSuccessMsg && (
         <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5 animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -116,7 +114,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       )}
 
-      {/* Metric Cards Row */}
+      
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard
           title="Apartamentos"
@@ -162,9 +160,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         />
       </div>
 
-      {/* Main Grid: Floor Plan Preview & Activity Feed */}
+      
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Floor Plan (2 Cols) */}
+        
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -198,9 +196,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           />
         </div>
 
-        {/* Live Event Feed & Active Occurrences (1 Col) */}
+        
         <div className="space-y-6">
-          {/* Alerts Card */}
+          
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -248,7 +246,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           </div>
 
-          {/* Quick Occurrences Box */}
+          
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -288,9 +286,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* MODAL: CONTATO PREVENTIVO DO SÍNDICO (NÃO GERA DENÚNCIA) */}
-      {/* ========================================================================= */}
+      
+      
+      
       {preventiveModalApartment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="vault-card rounded-3xl p-6 w-full max-w-lg space-y-4 border border-violet-500/30 shadow-2xl">
@@ -313,7 +311,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </button>
             </div>
 
-            {/* Disclaimer Explícito: NÃO CRIA OCORRÊNCIA */}
+            
             <div className="p-3 rounded-xl bg-violet-950/30 border border-violet-500/20 text-[11px] text-violet-300 space-y-1">
               <span className="font-bold flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
@@ -324,7 +322,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </p>
             </div>
 
-            {/* Telemetry info */}
+            
             <div className="p-3 rounded-xl bg-space-950 border border-white/5 flex items-center justify-between text-xs">
               <span className="text-slate-400">Leitura acústica atual da unidade:</span>
               <span className="font-mono font-bold text-amber-400">
@@ -356,7 +354,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 />
               </div>
 
-              {/* Modelos rápidos */}
+              
               <div className="space-y-1.5">
                 <span className="text-[10px] text-slate-500 uppercase font-bold block">Modelos Rápidos:</span>
                 <div className="flex flex-col gap-1.5 text-[11px]">

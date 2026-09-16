@@ -12,14 +12,10 @@ import { currentBillingProvider } from './billingProvider';
 export const DEFAULT_CONDO_ID = '00000000-0000-0000-0000-000000000001';
 export const DEFAULT_BUILDING_ID = '00000000-0000-0000-0000-000000000002';
 
-// BroadcastChannel para sincronização instantânea de chat entre abas/janelas locais
 export const chatBroadcastChannel = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined'
   ? new BroadcastChannel('dbsound_chat_realtime_sync')
   : null;
 
-// ============================================================================
-// DADOS DE DEMONSTRAÇÃO / BASELINE INICIAL
-// ============================================================================
 const initialApartments: Apartment[] = [
   { id: '10100000-0000-0000-0000-000000000101', building_id: DEFAULT_BUILDING_ID, number: '101', floor: 1, current_db: 45.2, status: 'normal', peak_db: 58.4, avg_db: 46.1, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80, created_at: new Date().toISOString() },
   { id: '10200000-0000-0000-0000-000000000102', building_id: DEFAULT_BUILDING_ID, number: '102', floor: 1, current_db: 51.0, status: 'normal', peak_db: 62.0, avg_db: 49.3, custom_day_threshold_db: 70, custom_night_threshold_db: 60, custom_critical_threshold_db: 80, created_at: new Date().toISOString() },
@@ -313,9 +309,6 @@ const initialMessages: Record<string, ConversationMessage[]> = {
   ]
 };
 
-// ============================================================================
-// PERSISTÊNCIA LOCAL RESILIENTE (localStorage + fallbacks)
-// ============================================================================
 const APTS_STORAGE_KEY = 'dbsound_apartments';
 const ALLOC_STORAGE_KEY = 'dbsound_allocations';
 const PROFILES_STORAGE_KEY = 'dbsound_profiles';
@@ -376,7 +369,6 @@ export function getStoredProfiles(): Profile[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Assegura que os perfis canônicos (Carlos Síndico, João Silva 101, etc) existam
         const map = new Map(parsed.map((p: Profile) => [p.id, p]));
         initialProfiles.forEach(ip => {
           if (!map.has(ip.id) && !parsed.some((p: Profile) => p.email.toLowerCase() === ip.email.toLowerCase())) {
@@ -513,9 +505,6 @@ export function saveStoredMessages(msgs: Record<string, ConversationMessage[]>) 
   }
 }
 
-// ============================================================================
-// STORE REATIVO LOCAL (Sincroniza com componentes e mantém estado persistente)
-// ============================================================================
 class LocalDataStore {
   apartments: Apartment[] = getStoredApartments();
   devices = [...initialDevices];
@@ -532,7 +521,6 @@ class LocalDataStore {
   listeners: Array<() => void> = [];
 
   constructor() {
-    // Aplicar alocações salvas nos perfis locais
     const allocs = getStoredAllocations();
     this.profiles.forEach(p => {
       if (allocs[p.id]) {
@@ -567,9 +555,7 @@ class LocalDataStore {
     saveStoredMessages(this.messages);
   }
 
-  saveAlerts() {
-    // Mantido em memória e sincronizado reativamente com listeners
-  }
+  saveAlerts() {}
 
   saveProfile(profile: Profile) {
     this.profiles = this.profiles.filter(p => p.id !== profile.id && p.email.toLowerCase() !== profile.email.toLowerCase());
@@ -589,7 +575,6 @@ class LocalDataStore {
     this.listeners.forEach(fn => fn());
   }
 
-  // Executa o exato pipeline unificado no store local respeitando limites customizados do apartamento
   processNoiseReading(reading: NoiseReading) {
     this.readings.unshift(reading);
     if (this.readings.length > 200) this.readings.pop();
@@ -600,7 +585,6 @@ class LocalDataStore {
       apt.peak_db = Math.max(apt.peak_db || 0, reading.decibel);
       apt.avg_db = Number((((apt.avg_db || 50) * 4 + reading.decibel) / 5).toFixed(1));
 
-      // Determinar política vigente e aplicar limites específicos do apartamento se existirem
       const now = new Date();
       const hour = now.getHours();
       const isNight = hour >= 22 || hour < 7;
@@ -612,7 +596,6 @@ class LocalDataStore {
         ? (apt.custom_critical_threshold_db ?? 70.0) 
         : (apt.custom_critical_threshold_db ?? 80.0);
 
-      // Debounce: contar leituras consecutivas/recentes >= limite crítico nos últimos 15 segundos
       const recentCriticals = this.readings.filter(r => 
         r.apartment_id === apt.id && 
         r.decibel >= criticalThreshold &&
@@ -620,7 +603,6 @@ class LocalDataStore {
       );
 
       if (reading.decibel >= criticalThreshold) {
-        // Exige pelo menos 3 amostras/segundos sustentados para confirmar alerta crítico
         if (recentCriticals.length >= 3) {
           apt.status = 'critical';
           const existingRecentAlert = this.alerts.find(a => 
@@ -644,7 +626,6 @@ class LocalDataStore {
             this.alerts.unshift(newAlert);
           }
         } else {
-          // Ruído pontual: decibelímetro atualiza para o valor real, mas status fica em warning sem disparar falso alerta crítico
           apt.status = 'warning';
         }
       } else if (reading.decibel >= warningThreshold) {
@@ -682,21 +663,15 @@ class LocalDataStore {
 
 export const localStore = new LocalDataStore();
 
-// ============================================================================
-// DATA SERVICE API (Camada de dados unificada, resiliente e autônoma)
-// ============================================================================
 export const DataService = {
-  // HELPER: Resolve ou cria dinamicamente o ID do bloco no Supabase
   async getOrCreateBuildingId(): Promise<string> {
     if (!isSupabaseConfigured || !supabase) return DEFAULT_BUILDING_ID;
     try {
-      // 1. Tenta buscar edifício existente
       const { data: bldgs } = await supabase.from('buildings').select('id, condominium_id').limit(1);
       if (bldgs && bldgs.length > 0 && bldgs[0].id) {
         return bldgs[0].id;
       }
 
-      // 2. Se não encontrou, busca ou cria condomínio
       let condoId = DEFAULT_CONDO_ID;
       const { data: condos } = await supabase.from('condominiums').select('id').limit(1);
       if (condos && condos.length > 0 && condos[0].id) {
@@ -710,7 +685,6 @@ export const DataService = {
         if (newCondo?.id) condoId = newCondo.id;
       }
 
-      // 3. Insere edifício vinculado
       const { data: newBldg } = await supabase.from('buildings').insert({
         id: DEFAULT_BUILDING_ID,
         condominium_id: condoId,
@@ -724,13 +698,11 @@ export const DataService = {
     return DEFAULT_BUILDING_ID;
   },
 
-  // APARTAMENTOS
   async getApartments(): Promise<Apartment[]> {
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase.from('apartments').select('*').order('number');
         if (!error && data && data.length > 0) {
-          // Merge inteligente: Supabase + locais não duplicados
           const supaApts = (data as Apartment[]).map(sa => {
             const local = localStore.apartments.find(la => la.id === sa.id || la.number === sa.number);
             return {
@@ -792,7 +764,6 @@ export const DataService = {
     };
 
     if (isSupabaseConfigured && supabase) {
-      // 1. Tenta RPC segura SECURITY DEFINER
       try {
         const { data: rpcData, error: rpcError } = await supabase.rpc('create_apartment_and_assign', {
           p_number: newApt.number,
@@ -815,12 +786,10 @@ export const DataService = {
         console.warn('create_apartment_and_assign RPC indisponível, tentando fallback dinâmico:', err);
       }
 
-      // 2. Fallback: resolve building_id real e insere direto
       try {
         buildingId = await this.getOrCreateBuildingId();
         newApt.building_id = buildingId;
 
-        // Tentativa A: com todas as colunas
         let { data, error } = await supabase.from('apartments').insert({
           id: newApt.id,
           building_id: buildingId,
@@ -831,7 +800,6 @@ export const DataService = {
           custom_critical_threshold_db: newApt.custom_critical_threshold_db,
         }).select().single();
 
-        // Tentativa B: se falhou (ex: colunas custom ainda não migradas no Postgres), insere campos básicos
         if (error) {
           const fallback = await supabase.from('apartments').insert({
             id: newApt.id,
@@ -863,7 +831,6 @@ export const DataService = {
       }
     }
 
-    // Persistência local garantida: o apartamento NUNCA desaparece
     localStore.apartments = localStore.apartments.filter(a => a.number !== newApt.number);
     localStore.apartments.push(newApt);
     localStore.saveApartments();
@@ -875,10 +842,8 @@ export const DataService = {
     profileId: string, 
     dto: CreateApartmentDTO
   ): Promise<{ success: boolean; apartment?: Apartment; message?: string }> {
-    // 1. Garante a criação do apartamento (local + remoto resiliente)
     const apt = await this.createApartment(dto);
 
-    // 2. Aloca o morador para este apartamento recém-criado
     await this.assignResidentToApartment(profileId, apt.id);
 
     return {
@@ -924,7 +889,6 @@ export const DataService = {
     localStore.apartments = localStore.apartments.filter(a => a.id !== apartmentId);
     localStore.saveApartments();
 
-    // Desvincular moradores locais
     localStore.profiles.forEach(p => {
       if (p.apartment_id === apartmentId) {
         p.apartment_id = null;
@@ -966,7 +930,6 @@ export const DataService = {
     return true;
   },
 
-  // PERFIS E GESTÃO DE MORADORES
   async saveProfile(profile: Profile): Promise<Profile> {
     const computedStatus = profile.role === 'admin' 
       ? 'approved' 
@@ -976,7 +939,6 @@ export const DataService = {
 
     if (isSupabaseConfigured && supabase) {
       try {
-        // 1. Obter condomínio válido existente no banco para não violar FK
         let condoId = profile.condominium_id;
         try {
           const { data: condoData } = await supabase.from('condominiums').select('id').limit(1).maybeSingle();
@@ -984,7 +946,6 @@ export const DataService = {
             condoId = condoData.id;
           }
         } catch {
-          // Ignora se consulta falhar
         }
 
         const payload = {
@@ -1000,13 +961,11 @@ export const DataService = {
           updated_at: new Date().toISOString(),
         };
 
-        // 2. Tenta upsert direto
         const { error: upsertErr } = await supabase.from('profiles').upsert(payload);
 
         if (upsertErr) {
           console.warn('Upsert direto em profiles falhou, tentando fallback via RPC/insert:', upsertErr.message);
 
-          // 3. Tenta RPC get_or_create_profile
           try {
             await supabase.rpc('get_or_create_profile', {
               p_user_id: profile.id,
@@ -1017,7 +976,6 @@ export const DataService = {
             console.warn('RPC get_or_create_profile falhou:', rpcErr);
           }
 
-          // 4. Se tiver apartment_id, tenta atualizar
           if (profile.apartment_id) {
             try {
               await supabase.from('profiles').update({
@@ -1025,9 +983,7 @@ export const DataService = {
                 status: 'approved',
                 updated_at: new Date().toISOString()
               }).eq('id', profile.id);
-            } catch {
-              // fallback local
-            }
+            } catch {}
           }
         }
       } catch (e) {
@@ -1050,7 +1006,6 @@ export const DataService = {
       try {
         let rawProfiles: any[] | null = null;
 
-        // 1. TENTA RPC DE SINCRONIZAÇÃO TOTAL COM AUTH.USERS
         try {
           const { data: syncedData, error: syncError } = await supabase.rpc('sync_and_get_all_profiles');
           if (!syncError && syncedData && Array.isArray(syncedData) && syncedData.length > 0) {
@@ -1060,7 +1015,6 @@ export const DataService = {
           console.warn('RPC sync_and_get_all_profiles ainda não aplicada no Supabase:', rpcErr);
         }
 
-        // 2. Se a RPC não estiver disponível, consulta direta da tabela profiles
         if (!rawProfiles) {
           const { data, error } = await supabase
             .from('profiles')
@@ -1096,7 +1050,6 @@ export const DataService = {
             };
           });
 
-          // Smart merge: preserva perfis locais/demo, mas prioriza registros reais vindos da nuvem
           const supaIds = new Set(mapped.map(m => m.id));
           const supaEmails = new Set(mapped.map(m => m.email.toLowerCase()));
           const localOnly = localStore.profiles.filter(lp => !supaIds.has(lp.id) && !supaEmails.has(lp.email.toLowerCase()));
@@ -1111,7 +1064,6 @@ export const DataService = {
       }
     }
 
-    // Aplica alocações salvas nos perfis locais
     localStore.profiles.forEach(p => {
       if (allocs[p.id]) {
         p.apartment_id = allocs[p.id];
@@ -1139,7 +1091,6 @@ export const DataService = {
     let aptNumber = apt?.number || 'N/A';
 
     if (isSupabaseConfigured && supabase) {
-      // 1. Assegura que o apartamento existe na tabela apartments do Supabase (impede FK violation)
       try {
         const { data: existingApt } = await supabase.from('apartments').select('id, number').eq('id', apartmentId).maybeSingle();
         if (!existingApt && apt) {
@@ -1157,7 +1108,6 @@ export const DataService = {
         console.warn('Aviso: falha preventiva ao garantir apartamento no Supabase:', e);
       }
 
-      // 2. Tenta RPC atômica com SECURITY DEFINER
       try {
         const { data: rpcData, error: rpcError } = await supabase.rpc('assign_resident_to_apartment', {
           p_profile_id: profileId,
@@ -1167,7 +1117,6 @@ export const DataService = {
         if (!rpcError && rpcData?.success) {
           if (rpcData.apartment_number) aptNumber = rpcData.apartment_number;
         } else {
-          // 3. Fallback: Update direto na tabela profiles com status='approved'
           const { error: updateError } = await supabase
             .from('profiles')
             .update({
@@ -1188,9 +1137,7 @@ export const DataService = {
                   updated_at: new Date().toISOString()
                 })
                 .eq('id', profileId);
-            } catch {
-              // fallback local
-            }
+            } catch {}
           }
         }
       } catch (err) {
@@ -1198,7 +1145,6 @@ export const DataService = {
       }
     }
 
-    // Atualiza localStore e salva persistência local garantida
     let p = localStore.profiles.find(prof => prof.id === profileId);
     if (p) {
       p.apartment_id = apartmentId;
@@ -1252,9 +1198,7 @@ export const DataService = {
             .from('profiles')
             .update({ apartment_id: null, status: 'pending', updated_at: new Date().toISOString() })
             .eq('id', profileId);
-        } catch {
-          // fallback
-        }
+        } catch {}
       }
     }
 
@@ -1296,20 +1240,17 @@ export const DataService = {
       ? await this.getApartmentById(profile.apartment_id) 
       : null;
 
-    // Alertas da unidade
     const allAlerts = await this.getAlerts(100);
     const userAlerts = profile.apartment_id 
       ? allAlerts.filter(a => a.apartment_id === profile.apartment_id) 
       : [];
 
-    // Ocorrências vinculadas
     const allOccurrences = await this.getOccurrences();
     const userOccurrences = allOccurrences.filter(o => 
       o.reporter_id === profile.id || 
       (profile.apartment_id && o.apartment_id === profile.apartment_id)
     );
 
-    // Leituras da unidade
     const userReadings = profile.apartment_id 
       ? localStore.readings.filter(r => r.apartment_id === profile.apartment_id).slice(0, 30)
       : [];
@@ -1331,7 +1272,6 @@ export const DataService = {
     };
   },
 
-  // DISPOSITIVOS
   async getDevices(): Promise<Device[]> {
     if (isSupabaseConfigured && supabase) {
       const { data } = await supabase.from('devices').select('*, apartments(number)');
@@ -1345,7 +1285,6 @@ export const DataService = {
     return localStore.devices;
   },
 
-  // SENSORES
   async getSensors(deviceId?: string): Promise<Sensor[]> {
     if (isSupabaseConfigured && supabase) {
       let query = supabase.from('sensors').select('*');
@@ -1358,7 +1297,6 @@ export const DataService = {
       : localStore.sensors;
   },
 
-  // POLÍTICAS
   async getPolicies(): Promise<NoisePolicy[]> {
     if (isSupabaseConfigured && supabase) {
       const { data } = await supabase.from('noise_policies').select('*').order('start_time');
@@ -1381,7 +1319,6 @@ export const DataService = {
     return false;
   },
 
-  // ALERTAS
   async getAlerts(limit = 20): Promise<Alert[]> {
     if (isSupabaseConfigured && supabase) {
       const { data } = await supabase.from('alerts').select('*, apartments(number)').order('created_at', { ascending: false }).limit(limit);
@@ -1404,7 +1341,6 @@ export const DataService = {
     localStore.notify();
   },
 
-  // OCORRÊNCIAS & DENÚNCIAS
   async createOccurrence(dto: Partial<Occurrence>): Promise<Occurrence> {
     let aptNumber = dto.apartment_number;
     if (!aptNumber && dto.apartment_id) {
@@ -1480,7 +1416,6 @@ export const DataService = {
             reporter_name: o.anonymous ? 'Morador Anônimo' : (o.reporter_name || 'Morador')
           }));
 
-          // Merge inteligente preservando registros locais
           const supaIds = new Set(supaOccs.map(s => s.id));
           const localOnly = localStore.occurrences.filter(lo => !supaIds.has(lo.id));
           const merged = [...supaOccs, ...localOnly];
@@ -1534,7 +1469,6 @@ export const DataService = {
       localStore.saveOccurrences();
     }
 
-    // Registra entrada de auditoria nos comentários
     const auditText = `[DECISÃO DO SÍNDICO: ${decision.toUpperCase()}] ${notes ? 'Parecer: ' + notes : 'Decisão registrada no sistema.'}`;
     await this.addComment(id, 'admin1', auditText, authorName);
 
@@ -1581,7 +1515,6 @@ export const DataService = {
     return newComment;
   },
 
-  // MULTAS E COBRANÇAS SIMULADAS
   async getFines(): Promise<SimulatedFine[]> {
     if (isSupabaseConfigured && supabase) {
       try {
@@ -1614,7 +1547,6 @@ export const DataService = {
     const apt = localStore.apartments.find(a => a.id === dto.apartment_id);
     const aptNumber = dto.apartment_number || apt?.number || 'N/A';
 
-    // Gera cobrança via BillingProvider desacoplado
     const charge = await currentBillingProvider.createCharge({
       amount: dto.amount,
       description: dto.reason,
@@ -1668,7 +1600,6 @@ export const DataService = {
       }
     }
 
-    // Se vinculada a uma ocorrência, atualiza o status da ocorrência para 'multa'
     if (dto.occurrence_id) {
       await this.decideOccurrence(
         dto.occurrence_id,
@@ -1677,7 +1608,6 @@ export const DataService = {
       );
     }
 
-    // Notificação unilateral/informativa para o morador da unidade
     const fineAlert: Alert = {
       id: `alt-fine-${Date.now()}`,
       apartment_id: fine.apartment_id,
@@ -1727,7 +1657,6 @@ export const DataService = {
 
     localStore.saveFines();
 
-    // Adiciona nota na ocorrência vinculada (se houver)
     if (fine.occurrence_id) {
       await this.addComment(
         fine.occurrence_id,
@@ -1737,7 +1666,6 @@ export const DataService = {
       );
     }
 
-    // Cria notificação/alerta para o morador da unidade
     const cancelAlert: Alert = {
       id: `alt-cancel-${Date.now()}`,
       apartment_id: fine.apartment_id,
@@ -1776,9 +1704,6 @@ export const DataService = {
     return true;
   },
 
-  // ============================================================================
-  // CONVERSAS, CHAT BIDIRECIONAL E CHAT PREVENTIVO
-  // ============================================================================
   async getConversations(apartmentId?: string): Promise<Conversation[]> {
     if (isSupabaseConfigured && supabase) {
       try {
@@ -1809,7 +1734,6 @@ export const DataService = {
       result = result.filter(c => c.apartment_id === apartmentId);
     }
 
-    // Calcula unread_count e last_message com exatidão para cada conversa
     return result.map(conv => {
       const msgs = localStore.messages[conv.id] || [];
       const unread = msgs.filter(m => !m.read).length;
@@ -1943,7 +1867,6 @@ export const DataService = {
       rawList = localStore.messages[conversationId] || [];
     }
 
-    // Normalização estrita: garante message, content e sender_role sempre preenchidos
     const normalized: ConversationMessage[] = rawList.map((m: any) => {
       const msgText = m.message || m.content || '';
       let role: 'syndic' | 'resident' = m.sender_role;
@@ -2023,7 +1946,6 @@ export const DataService = {
           created_at: newMsg.created_at,
         });
 
-        // Atualiza timestamp da conversa
         await supabase.from('conversations').update({ updated_at: now }).eq('id', dto.conversation_id);
       } catch (err) {
         console.warn('Erro ao inserir mensagem no Supabase:', err);
@@ -2036,7 +1958,6 @@ export const DataService = {
     localStore.messages[dto.conversation_id].push(newMsg);
     localStore.saveMessages();
 
-    // Atualiza conversa local
     const conv = localStore.conversations.find(c => c.id === dto.conversation_id);
     if (conv) {
       conv.updated_at = now;
@@ -2046,7 +1967,6 @@ export const DataService = {
 
     localStore.notify();
 
-    // Dispara sincronização instantânea em tempo real entre abas/janelas
     if (chatBroadcastChannel) {
       chatBroadcastChannel.postMessage({
         type: 'INSERT',
@@ -2109,14 +2029,12 @@ export const DataService = {
     }
   },
 
-  // Inscreve-se no canal de eventos em tempo real (Supabase Realtime + BroadcastChannel local)
   subscribeToChatRealtime(callback: (event: {
     type: 'INSERT' | 'UPDATE' | 'READ_RECEIPT';
     message?: ConversationMessage;
     conversation_id?: string;
     read_at?: string;
   }) => void): () => void {
-    // 1. Escuta eventos locais via BroadcastChannel (multi-abas e multi-janelas instantâneo sem F5)
     const handleBroadcast = (evt: MessageEvent) => {
       if (evt.data) {
         callback(evt.data);
@@ -2126,7 +2044,6 @@ export const DataService = {
       chatBroadcastChannel.addEventListener('message', handleBroadcast);
     }
 
-    // 2. Escuta eventos remotos do Supabase Realtime via WebSocket (se conectado)
     let channel: any = null;
     if (isSupabaseConfigured && supabase) {
       try {
@@ -2200,17 +2117,14 @@ export const DataService = {
     for (const conv of allConvs) {
       const msgs = localStore.messages[conv.id] || [];
       if (isSyndic) {
-        // Mensagens não lidas enviadas por moradores
         totalUnread += msgs.filter(m => !m.read && (m.sender_role === 'resident' || (!m.sender_role && !m.sender_name.toLowerCase().includes('síndico')))).length;
       } else {
-        // Mensagens não lidas enviadas pela administração
         totalUnread += msgs.filter(m => !m.read && (m.sender_role === 'syndic' || m.sender_name.toLowerCase().includes('síndico') || m.sender_name.toLowerCase().includes('administração'))).length;
       }
     }
     return totalUnread;
   },
 
-  // PIPELINE ÚNICO: INGESTÃO DE LEITURA (SIMULADOR, MANUAL OU ESP32)
   async injectReading(data: {
     apartment_id: string;
     decibel: number;
@@ -2233,7 +2147,6 @@ export const DataService = {
 
     if (isSupabaseConfigured && supabase) {
       try {
-        // 1. Tenta invocar RPC inject_noise_reading atômica
         const { error: rpcErr } = await supabase.rpc('inject_noise_reading', {
           p_apartment_id: data.apartment_id,
           p_decibel: data.decibel,
@@ -2245,7 +2158,6 @@ export const DataService = {
 
         if (rpcErr) {
           console.warn('RPC inject_noise_reading indisponível, executando fallback direto no Supabase:', rpcErr.message);
-          // Inserir leitura
           await supabase.from('noise_readings').insert({
             apartment_id: data.apartment_id,
             decibel: data.decibel,
@@ -2255,7 +2167,6 @@ export const DataService = {
             device_id: data.device_id,
           });
 
-          // Atualizar apartments no banco
           await supabase.from('apartments').update({
             current_db: data.decibel,
             updated_at: new Date().toISOString()
@@ -2287,7 +2198,6 @@ export const DataService = {
     return localStore.readings.find(r => r.apartment_id === apartmentId) || null;
   },
 
-  // LIMPEZA SEGURA DE DADOS DE TESTE
   async cleanTestData(): Promise<{ success: boolean; deletedCount: number }> {
     if (isSupabaseConfigured && supabase) {
       try {

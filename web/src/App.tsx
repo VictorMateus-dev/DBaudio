@@ -20,7 +20,6 @@ import { DataService, localStore } from './lib/dataService';
 import { supabase, isSupabaseConfigured } from './lib/supabaseClient';
 import { Apartment, Device, Sensor, Alert, Occurrence, NoisePolicy, Profile } from './types/database.types';
 
-// Componente para proteção de rotas com base em autenticação e papel (RBAC)
 interface ProtectedRouteProps {
   requiredRole?: 'admin' | 'resident';
   children: React.ReactNode;
@@ -44,7 +43,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredRole, children 
     return <Navigate to="/login" replace />;
   }
 
-  // Morador tentando acessar rotas administrativas do síndico -> Redirecionado para visão do morador
   const isExplicitAdmin = user.role === 'admin' || user.email?.toLowerCase().includes('admin') || user.email === 'admin@dbsound.com';
   if (requiredRole === 'admin' && !isExplicitAdmin) {
     return <Navigate to="/morador/inicio" replace />;
@@ -53,7 +51,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredRole, children 
   return <>{children}</>;
 };
 
-// Wrapper para detalhe do apartamento com parâmetros de rota
 const ApartmentDetailRouteWrapper: React.FC<{
   apartments: Apartment[];
   devices: Device[];
@@ -96,7 +93,6 @@ const ApartmentDetailRouteWrapper: React.FC<{
   );
 };
 
-// Layout Web Admin do Síndico (Desktop Cockpit)
 interface SindicoLayoutProps {
   alerts: Alert[];
   occurrences: Occurrence[];
@@ -114,7 +110,6 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Determina aba ativa pela URL
   const path = location.pathname;
   let currentTab: NavTab = 'overview';
   if (path.includes('/sindico/apartamento')) currentTab = 'floorplan';
@@ -142,7 +137,7 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
 
   return (
     <div className="h-screen w-screen bg-space-950 text-slate-100 overflow-hidden lg:grid lg:grid-cols-[260px_minmax(0,1fr)] flex flex-col">
-      {/* 1. Sidebar Desktop: Coluna 1 do Grid (260px estrito, sem sobreposição) */}
+      
       <div className="hidden lg:block h-full w-[260px] shrink-0">
         <Sidebar
           currentTab={currentTab}
@@ -154,7 +149,7 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
         />
       </div>
 
-      {/* 2. Top-bar Mobile com Hambúrguer (☰ Ocorrências / dBSound) */}
+      
       <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-space-900 border-b border-white/10 shrink-0 select-none">
         <button
           type="button"
@@ -170,7 +165,7 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
         </span>
       </div>
 
-      {/* 3. Mobile Drawer Overlay (quando hambúrguer aberto) */}
+      
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex animate-fadeIn">
           <div 
@@ -191,7 +186,7 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
         </div>
       )}
 
-      {/* 4. Área Principal do Conteúdo: Coluna 2 do Grid (ou tela cheia no mobile) */}
+      
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
         <Header
           alerts={alerts}
@@ -212,7 +207,6 @@ export const App: React.FC = () => {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Estados de dados da plataforma
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [sensors, setSensors] = useState<Sensor[]>([]);
@@ -247,12 +241,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     loadAllData();
 
-    // 1. Inscrição reativa local (mesma aba/janela)
     const unsubscribeLocal = localStore.subscribe(() => {
       loadAllData();
     });
 
-    // 2. Sincronização entre abas/janelas via evento 'storage' do navegador
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'dbsound_apartments' || e.key === 'dbsound_allocations' || e.key === 'dbsound_profiles' || e.key === 'dbsound_conversations' || e.key === 'dbsound_messages' || e.key === 'dbsound_fines') {
         loadAllData();
@@ -260,12 +252,10 @@ export const App: React.FC = () => {
     };
     window.addEventListener('storage', handleStorageChange);
 
-    // 3. Heartbeat polling a cada 2.5s para assegurar sincronismo contínuo entre telas
     const heartbeatInterval = setInterval(() => {
       loadAllData();
     }, 2500);
 
-    // 4. Supabase Realtime Channel (quando conectado ao backend remoto)
     let channel: any = null;
     if (isSupabaseConfigured && supabase) {
       try {
@@ -310,7 +300,6 @@ export const App: React.FC = () => {
     return !isExplicitAdmin && !p.apartment_id && !p.apartment_number;
   }).length;
 
-  // Resolução da unidade do morador
   const getResidentApartment = () => {
     if (!user) return null;
     let residentApt = (user.apartment_id || user.apartment_number)
@@ -320,7 +309,6 @@ export const App: React.FC = () => {
         ) || null
       : null;
 
-    // Se o morador já possui apartment_id ou apartment_number mas a lista geral ainda não o contém, sintetiza
     if (!residentApt && (user.apartment_id || user.apartment_number)) {
       residentApt = {
         id: user.apartment_id || '10100000-0000-0000-0000-000000000101',
@@ -342,7 +330,7 @@ export const App: React.FC = () => {
 
   return (
     <Routes>
-      {/* 1. Rota de Login / Cadastro */}
+      
       <Route
         path="/login"
         element={
@@ -358,7 +346,7 @@ export const App: React.FC = () => {
         }
       />
 
-      {/* 2. Rotas do Síndico (Web Admin Cockpit) - Protegidas para Administradores */}
+      
       <Route
         path="/sindico"
         element={
@@ -491,7 +479,7 @@ export const App: React.FC = () => {
         />
       </Route>
 
-      {/* 3. Rotas do Morador (Mobile App/PWA) - Protegidas para Moradores */}
+      
       <Route
         path="/morador/*"
         element={
@@ -506,10 +494,10 @@ export const App: React.FC = () => {
         }
       />
 
-      {/* 4. Rota Isolada para Impressão de Cobrança Simulada (Boleto) */}
+      
       <Route path="/boleto/:multaId" element={<BoletoPage />} />
 
-      {/* 5. Rota Raiz - Despacha inteligentemente conforme o perfil logado */}
+      
       <Route
         path="/"
         element={
@@ -530,7 +518,7 @@ export const App: React.FC = () => {
         }
       />
 
-      {/* 5. Fallback para rotas não mapeadas */}
+      
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
