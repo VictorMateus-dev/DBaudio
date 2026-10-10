@@ -9,6 +9,7 @@ import {
   ReferenceLine,
   CartesianGrid
 } from 'recharts';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface ChartPoint {
   time: string;
@@ -28,6 +29,8 @@ export const NoiseChart: React.FC<NoiseChartProps> = ({
   criticalThreshold = 80,
   height = 240,
 }) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const chartData = data.length > 0 ? data : [
     { time: '14:00', decibel: 44 },
     { time: '15:00', decibel: 48 },
@@ -70,35 +73,35 @@ export const NoiseChart: React.FC<NoiseChartProps> = ({
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="saasNoiseGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#2563eb" stopOpacity={0.25} />
-                <stop offset="70%" stopColor="#3b82f6" stopOpacity={0.05} />
-                <stop offset="100%" stopColor="#ffffff" stopOpacity={0.0} />
+                <stop offset="0%" stopColor="#2563eb" stopOpacity={isDark ? 0.4 : 0.25} />
+                <stop offset="70%" stopColor="#3b82f6" stopOpacity={isDark ? 0.1 : 0.05} />
+                <stop offset="100%" stopColor={isDark ? "#0f172a" : "#ffffff"} stopOpacity={0.0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#1e293b" : "#f1f5f9"} />
             <XAxis 
               dataKey="time" 
-              stroke="#94a3b8" 
+              stroke={isDark ? "#64748b" : "#94a3b8"} 
               fontSize={11} 
               tickLine={false} 
-              axisLine={{ stroke: '#e2e8f0' }} 
+              axisLine={{ stroke: isDark ? "#1e293b" : "#e2e8f0" }} 
             />
             <YAxis 
               domain={[30, 100]} 
-              stroke="#94a3b8" 
+              stroke={isDark ? "#64748b" : "#94a3b8"} 
               fontSize={11} 
               tickLine={false} 
-              axisLine={{ stroke: '#e2e8f0' }}
+              axisLine={{ stroke: isDark ? "#1e293b" : "#e2e8f0" }}
               tickFormatter={(v) => `${v}dB`}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: '#ffffff',
-                borderColor: '#e2e8f0',
+                backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                borderColor: isDark ? '#1e293b' : '#e2e8f0',
                 borderRadius: '8px',
                 fontSize: '12px',
-                color: '#0f172a',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06)',
+                color: isDark ? '#f8fafc' : '#0f172a',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
               }}
               formatter={(value: any) => [`${value} dB`, 'Nível Acústico']}
               labelFormatter={(label) => `Horário: ${label}`}

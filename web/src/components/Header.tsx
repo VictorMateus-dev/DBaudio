@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Bell, Clock, Wifi, Building, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { Alert } from '../types/database.types';
 
 interface HeaderProps {
@@ -11,6 +12,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ alerts, onSelectApartment }) => {
   const { isDemoMode } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [showAlertDropdown, setShowAlertDropdown] = useState(false);
 
   const now = new Date();
@@ -52,8 +54,25 @@ export const Header: React.FC<HeaderProps> = ({ alerts, onSelectApartment }) => 
       </div>
 
       {/* Status & Notifications */}
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-2.5">
         
+        {/* Dark/Light Mode Switcher */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 transition shadow-subtle flex items-center gap-1.5 cursor-pointer"
+          title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+        >
+          {theme === 'dark' ? (
+            <Sun className="w-4 h-4 text-amber-400" />
+          ) : (
+            <Moon className="w-4 h-4 text-slate-600" />
+          )}
+          <span className="text-[11px] font-semibold hidden xl:inline">
+            {theme === 'dark' ? 'Modo Escuro' : 'Modo Claro'}
+          </span>
+        </button>
+
         {isDemoMode ? (
           <div className="flex items-center space-x-1.5 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1 rounded-full text-xs font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
@@ -70,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({ alerts, onSelectApartment }) => 
         <div className="relative">
           <button
             onClick={() => setShowAlertDropdown(!showAlertDropdown)}
-            className="relative p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 transition shadow-subtle"
+            className="relative p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 transition shadow-subtle cursor-pointer"
             title="Alertas do Sistema"
           >
             <Bell className="w-4 h-4" />

@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { 
   Volume2, Lock, Mail, ArrowRight, ShieldCheck, User, Phone, 
-  CheckCircle2, Sparkles, Eye, EyeOff, AlertCircle, Building2 
+  CheckCircle2, Sparkles, Eye, EyeOff, AlertCircle, Building2,
+  Sun, Moon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 export const LoginPage: React.FC = () => {
   const { login, signUp, isLoading } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
 
   const [loginEmail, setLoginEmail] = useState('admin@dbsound.com');
@@ -115,6 +118,28 @@ export const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-center items-center p-4 relative animate-fadeIn">
       
+      {/* Botão de alternância de tema */}
+      <div className="absolute top-4 right-4 z-20">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm transition flex items-center gap-2 text-xs font-semibold cursor-pointer"
+          title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+        >
+          {theme === 'dark' ? (
+            <>
+              <Sun className="w-4 h-4 text-amber-400" />
+              <span>Modo Claro</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-4 h-4 text-slate-600" />
+              <span>Modo Escuro</span>
+            </>
+          )}
+        </button>
+      </div>
+
       <div className="w-full max-w-md space-y-7 relative z-10">
         
         {/* Marca & Header */}

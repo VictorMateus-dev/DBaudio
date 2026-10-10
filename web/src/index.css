@@ -8,6 +8,12 @@
     background-color: #f8fafc;
     color: #0f172a;
     -webkit-font-smoothing: antialiased;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  html.dark body {
+    background-color: #090d16;
+    color: #f8fafc;
   }
 }
 
@@ -32,6 +38,84 @@
   transition: all 0.2s ease;
 }
 
+/* Dark Mode Theme Rules */
+html.dark .saas-card,
+html.dark .vault-card {
+  background-color: #0f172a;
+  border-color: #1e293b;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+}
+
+html.dark .saas-card:hover {
+  border-color: #334155;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+}
+
+html.dark .bg-slate-50:not(.keep-light) {
+  background-color: #090d16;
+}
+
+html.dark .bg-slate-100:not(#printable-boleto-area *):not(.keep-light) {
+  background-color: #1e293b;
+}
+
+html.dark .bg-white:not(#printable-boleto-area):not(#printable-boleto-area *):not(.keep-light) {
+  background-color: #0f172a;
+}
+
+html.dark .border-slate-100:not(#printable-boleto-area *):not(.keep-light),
+html.dark .border-slate-200:not(#printable-boleto-area *):not(.keep-light),
+html.dark .border-slate-200\/80:not(#printable-boleto-area *):not(.keep-light),
+html.dark .border-slate-300:not(#printable-boleto-area *):not(.keep-light) {
+  border-color: #1e293b;
+}
+
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1e293b;
+}
+
+html.dark .text-slate-900:not(#printable-boleto-area *):not(.keep-light) {
+  color: #f8fafc;
+}
+
+html.dark .text-slate-800:not(#printable-boleto-area *):not(.keep-light) {
+  color: #f1f5f9;
+}
+
+html.dark .text-slate-700:not(#printable-boleto-area *):not(.keep-light) {
+  color: #cbd5e1;
+}
+
+html.dark .text-slate-600:not(#printable-boleto-area *):not(.keep-light) {
+  color: #94a3b8;
+}
+
+html.dark .text-slate-500:not(#printable-boleto-area *):not(.keep-light) {
+  color: #64748b;
+}
+
+html.dark .hover\:bg-slate-50:hover:not(.keep-light) {
+  background-color: #1e293b;
+}
+
+html.dark .hover\:bg-slate-100:hover:not(.keep-light) {
+  background-color: #1e293b;
+}
+
+html.dark input:not([type="checkbox"]):not([type="radio"]):not(.keep-light),
+html.dark select:not(.keep-light),
+html.dark textarea:not(.keep-light) {
+  background-color: #131b2e;
+  border-color: #1e293b;
+  color: #f8fafc;
+}
+
+html.dark input:disabled {
+  background-color: #090d16;
+  color: #64748b;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -48,6 +132,14 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }
 
 @keyframes subtle-pulse {

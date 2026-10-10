@@ -12,9 +12,12 @@ import {
   UserCheck,
   MessageSquare,
   Activity,
-  X
+  X,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 export type NavTab = 'overview' | 'floorplan' | 'residents' | 'occurrences' | 'messages' | 'devices' | 'policies' | 'simulator';
 
@@ -51,6 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
 }) => {
   const { role, user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const navGroups: NavGroup[] = [
     {
@@ -184,13 +188,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
 
-            <button
-              onClick={() => logout()}
-              title="Sair da Conta"
-              className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-rose-400 transition"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+                className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-amber-400 transition cursor-pointer"
+              >
+                {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                onClick={() => logout()}
+                title="Sair da Conta"
+                className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           <div>

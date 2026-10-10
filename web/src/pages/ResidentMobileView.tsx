@@ -29,11 +29,14 @@ import {
   EyeOff, 
   Send, 
   ShieldAlert,
-  MessageSquare
+  MessageSquare,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { Apartment, Alert, Occurrence, SimulatedFine, OccurrenceStatus, Conversation, ConversationMessage } from '../types/database.types';
 import { DataService, localStore } from '../lib/dataService';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { PrintableBoleto } from '../components/PrintableBoleto';
 
 interface ResidentMobileViewProps {
@@ -50,6 +53,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   onRefresh,
 }) => {
   const { user, switchRole, refreshProfile, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'messages' | 'occurrences' | 'profile' | 'privacy'>('home');
   const [occSubTab, setOccSubTab] = useState<'new' | 'notices' | 'my_reports'>('new');
   const [activeModalAlert, setActiveModalAlert] = useState<Alert | null>(null);
@@ -384,8 +388,17 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
 
         <div className="flex items-center space-x-2">
           <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm transition flex items-center justify-center cursor-pointer"
+            title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+          >
+            {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-slate-600" />}
+          </button>
+
+          <button
             onClick={() => setIsPhoneFrame(!isPhoneFrame)}
-            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm transition flex items-center gap-1.5 text-xs font-medium"
+            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm transition flex items-center gap-1.5 text-xs font-medium cursor-pointer"
             title="Alternar entre visualização ampla e moldura mobile"
           >
             <Smartphone className="w-3.5 h-3.5 text-slate-500" />
