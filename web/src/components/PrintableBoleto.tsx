@@ -1,6 +1,6 @@
 import React from 'react';
 import { SimulatedFine } from '../types/database.types';
-import { Printer, Copy, Check, CheckCircle2, X } from 'lucide-react';
+import { Printer, Copy, Check, CheckCircle2, X, AlertTriangle, Ban } from 'lucide-react';
 
 interface PrintableBoletoProps {
   fine: SimulatedFine;
@@ -40,36 +40,44 @@ export const PrintableBoleto: React.FC<PrintableBoletoProps> = ({
   const isPaid = fine.status === 'paga';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
-      <div className="w-full max-w-2xl my-8">
-        
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
+      <div className="w-full max-w-2xl my-8 relative">
+        <button
+          onClick={onClose}
+          className="absolute -top-10 right-0 p-1.5 text-slate-400 hover:text-white rounded-lg transition print:hidden"
+          title="Fechar"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
         <div 
           id="printable-boleto-area" 
-          className="bg-white text-slate-900 rounded-3xl p-6 md:p-8 space-y-5 shadow-2xl relative border-2 border-slate-300"
+          className="bg-white text-slate-900 rounded-2xl p-6 md:p-8 space-y-5 shadow-elevated relative border border-slate-200 print:border-none print:shadow-none print:p-0"
         >
           
-          <div className="border-b-2 border-dashed border-red-400 pb-3 text-center">
-            <div className="inline-block px-3 py-1 rounded bg-red-100 text-red-700 font-mono text-xs font-black uppercase tracking-widest border border-red-300">
-              ⚠️ DOCUMENTO DE COBRANÇA SIMULADO — SEM VALIDADE FINANCEIRA
+          <div className="border-b-2 border-dashed border-red-300 pb-3 text-center">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-red-50 text-red-700 font-mono text-xs font-bold uppercase tracking-wider border border-red-200">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+              <span>DOCUMENTO DE COBRANÇA SIMULADO — SEM VALIDADE FINANCEIRA</span>
             </div>
-            <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">
+            <p className="text-[10px] text-slate-500 mt-1 uppercase font-semibold tracking-wider">
               Ambiente de Demonstração Acadêmica dBSound • Não receber em rede bancária ou lotéricas
             </p>
           </div>
 
           
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center font-black text-sm">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-brand-600 text-white flex items-center justify-center font-black text-sm shadow-subtle">
                   dB
                 </div>
                 <div>
-                  <h2 className="text-lg font-black tracking-tight text-slate-900 leading-tight">
-                    Condomínio Residencial Parque das Flores
+                  <h2 className="text-base font-bold tracking-tight text-slate-900 leading-tight">
+                    Condomínio Residencial dBSound
                   </h2>
                   <p className="text-[11px] text-slate-500">
-                    Administração Condominial dBSound • CNPJ: 00.000.000/0001-00
+                    Administração Condominial Inteligente • CNPJ: 00.000.000/0001-00
                   </p>
                 </div>
               </div>
@@ -91,9 +99,10 @@ export const PrintableBoleto: React.FC<PrintableBoletoProps> = ({
 
           
           {isCancelled && (
-            <div className="p-3 rounded-xl bg-red-50 border-2 border-red-300 text-red-800 text-xs space-y-1">
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs space-y-1">
               <div className="font-bold flex items-center gap-1.5 uppercase tracking-wide">
-                <span>🚫 ESTA MULTA FOI CANCELADA PELO SÍNDICO</span>
+                <Ban className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                <span>ESTA MULTA FOI CANCELADA PELO SÍNDICO</span>
               </div>
               <p className="text-[11px] leading-relaxed">
                 <strong>Motivo do cancelamento:</strong> {fine.cancellation_reason || 'Revisão administrativa deferida.'}

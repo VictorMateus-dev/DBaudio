@@ -30,10 +30,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredRole, children 
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-space-950 flex items-center justify-center text-slate-400">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-600">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-medium">Carregando ambiente dBSound...</span>
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-medium text-slate-500">Carregando ambiente dBSound...</span>
         </div>
       </div>
     );
@@ -136,8 +136,9 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
   };
 
   return (
-    <div className="h-screen w-screen bg-space-950 text-slate-100 overflow-hidden lg:grid lg:grid-cols-[260px_minmax(0,1fr)] flex flex-col">
+    <div className="h-screen w-screen bg-slate-50 text-slate-900 overflow-hidden lg:grid lg:grid-cols-[260px_minmax(0,1fr)] flex flex-col">
       
+      {/* Desktop Sidebar */}
       <div className="hidden lg:block h-full w-[260px] shrink-0">
         <Sidebar
           currentTab={currentTab}
@@ -149,30 +150,30 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
         />
       </div>
 
-      
-      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-space-900 border-b border-white/10 shrink-0 select-none">
+      {/* Mobile Top Bar */}
+      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800 shrink-0 select-none">
         <button
           type="button"
           onClick={() => setIsMobileMenuOpen(true)}
-          className="flex items-center gap-2.5 text-white font-bold text-sm hover:text-violet-300 transition"
+          className="flex items-center gap-2.5 text-white font-bold text-sm hover:text-blue-300 transition"
         >
-          <Menu className="w-5 h-5 text-violet-400" />
+          <Menu className="w-5 h-5 text-blue-400" />
           <span>{currentTab === 'occurrences' ? 'Ocorrências & Decisões' : 'dBSound Síndico'}</span>
         </button>
 
-        <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+        <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-700/60">
           Admin
         </span>
       </div>
 
-      
+      {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex animate-fadeIn">
           <div 
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity" 
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity" 
             onClick={() => setIsMobileMenuOpen(false)} 
           />
-          <div className="relative w-[270px] h-full z-10 shadow-2xl bg-space-900 flex flex-col">
+          <div className="relative w-[270px] h-full z-10 shadow-2xl bg-slate-900 flex flex-col">
             <Sidebar
               currentTab={currentTab}
               onSelectTab={handleSelectTab}
@@ -502,10 +503,10 @@ export const App: React.FC = () => {
         path="/"
         element={
           isLoading ? (
-            <div className="min-h-screen bg-space-950 flex items-center justify-center text-slate-400">
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-600">
               <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs font-medium">Iniciando dBSound...</span>
+                <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs font-medium text-slate-500">Iniciando dBSound...</span>
               </div>
             </div>
           ) : !user ? (

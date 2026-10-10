@@ -28,20 +28,20 @@ export const BoletoPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
-        <p className="text-sm text-slate-400">Carregando documento de cobrança simulada...</p>
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-4">
+        <p className="text-sm text-slate-500 font-medium">Carregando documento de cobrança simulada...</p>
       </div>
     );
   }
 
   if (!fine) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 space-y-4">
-        <h2 className="text-lg font-bold text-red-400">Boleto não encontrado</h2>
-        <p className="text-xs text-slate-400">O identificador de multa informado ({multaId}) não foi localizado.</p>
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-4 space-y-4">
+        <h2 className="text-lg font-bold text-rose-600">Boleto não encontrado</h2>
+        <p className="text-xs text-slate-500">O identificador de multa informado ({multaId}) não foi localizado.</p>
         <button
           onClick={() => navigate('/sindico/ocorrencias')}
-          className="px-4 py-2 rounded-xl bg-violet-600 text-white text-xs font-semibold"
+          className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-subtle transition"
         >
           Voltar para Ocorrências
         </button>
@@ -93,7 +93,7 @@ export const BoletoPage: React.FC = () => {
         
         <div className="flex items-start justify-between border-b pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-600 text-white font-black flex items-center justify-center text-sm">
+            <div className="w-10 h-10 rounded-xl bg-brand-600 text-white font-black flex items-center justify-center text-sm shadow-subtle">
               dB
             </div>
             <div>
@@ -164,7 +164,7 @@ export const BoletoPage: React.FC = () => {
                   setTimeout(() => setCopiedBarcode(false), 2000);
                 }
               }}
-              className="text-[10px] text-violet-700 font-semibold flex items-center gap-1 hover:underline print:hidden"
+              className="text-[10px] text-brand-600 hover:text-brand-700 font-semibold flex items-center gap-1 hover:underline print:hidden"
             >
               {copiedBarcode ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
               <span>{copiedBarcode ? 'Copiado!' : 'Copiar'}</span>

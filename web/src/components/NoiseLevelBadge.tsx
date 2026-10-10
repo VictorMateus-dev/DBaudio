@@ -15,22 +15,22 @@ export const NoiseLevelBadge: React.FC<NoiseLevelBadgeProps> = ({
     normal: {
       label: 'Normal',
       dotColor: 'bg-emerald-500',
-      badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     },
     warning: {
       label: 'Atenção',
-      dotColor: 'bg-amber-400',
-      badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+      dotColor: 'bg-amber-500',
+      badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
     },
     critical: {
       label: 'Ruído Elevado',
-      dotColor: 'bg-red-500',
-      badgeClass: 'bg-red-500/10 text-red-400 border-red-500/20 animate-pulse',
+      dotColor: 'bg-rose-500',
+      badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
     },
     offline: {
       label: 'Offline',
-      dotColor: 'bg-slate-500',
-      badgeClass: 'bg-slate-800 text-slate-400 border-slate-700',
+      dotColor: 'bg-slate-400',
+      badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
     },
   };
 

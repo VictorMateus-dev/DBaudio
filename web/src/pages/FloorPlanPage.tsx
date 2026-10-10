@@ -26,15 +26,16 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto">
       
+      {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Planta Geral dos Apartamentos</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Planta Geral dos Apartamentos</h1>
+          <p className="text-sm text-slate-500">
             Mapeamento acústico em tempo real por andar e unidade residencial.
           </p>
         </div>
 
-        
+        {/* Search & Filter Controls */}
         <div className="flex flex-wrap items-center gap-3">
           
           <div className="relative">
@@ -44,16 +45,15 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
               placeholder="Buscar unidade (ex: 202)..."
               value={searchNumber}
               onChange={(e) => setSearchNumber(e.target.value)}
-              className="bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 w-48"
+              className="bg-white border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 w-48 shadow-subtle"
             />
           </div>
 
-          
-          <div className="flex items-center space-x-1 bg-slate-900 border border-slate-800 rounded-lg p-1 text-xs">
+          <div className="flex items-center space-x-1 bg-white border border-slate-200 rounded-lg p-1 text-xs shadow-subtle">
             <button
               onClick={() => setFilterStatus('all')}
               className={`px-3 py-1.5 rounded-md font-medium transition ${
-                filterStatus === 'all' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                filterStatus === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Todos
@@ -61,7 +61,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
             <button
               onClick={() => setFilterStatus('normal')}
               className={`px-3 py-1.5 rounded-md font-medium transition ${
-                filterStatus === 'normal' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+                filterStatus === 'normal' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Normal
@@ -69,7 +69,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
             <button
               onClick={() => setFilterStatus('warning')}
               className={`px-3 py-1.5 rounded-md font-medium transition ${
-                filterStatus === 'warning' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+                filterStatus === 'warning' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Atenção
@@ -77,7 +77,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
             <button
               onClick={() => setFilterStatus('critical')}
               className={`px-3 py-1.5 rounded-md font-medium transition ${
-                filterStatus === 'critical' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'
+                filterStatus === 'critical' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Elevado
@@ -87,7 +87,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition"
+              className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-900 shadow-subtle transition"
               title="Atualizar leituras"
             >
               <RefreshCw className="w-4 h-4" />

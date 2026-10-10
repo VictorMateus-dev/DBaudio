@@ -6,36 +6,30 @@ export default {
   theme: {
     extend: {
       colors: {
-        space: {
-          950: '#06060c',
-          900: '#0a0b16',
-          850: '#0f1022',
-          800: '#15172e',
-          700: '#1f2244',
-        },
-        vault: {
-          purple: '#8b5cf6',
-          violet: '#a855f7',
-          fuchsia: '#d946ef',
-          cyan: '#06b6d4',
-          blue: '#3b82f6',
+        brand: {
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
         },
         noise: {
           normal: '#10b981',
           warning: '#f59e0b',
           critical: '#ef4444',
-          offline: '#6b7280',
+          offline: '#64748b',
         }
       },
       boxShadow: {
-        'glow-purple': '0 0 25px rgba(139, 92, 246, 0.25)',
-        'glow-violet': '0 0 35px rgba(168, 85, 247, 0.3)',
-        'glow-cyan': '0 0 25px rgba(6, 182, 212, 0.25)',
-        'glass-card': '0 4px 30px rgba(0, 0, 0, 0.5)',
-      },
-      backgroundImage: {
-        'vault-gradient': 'radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.18) 0%, rgba(6, 6, 12, 0) 70%)',
-        'vault-glow': 'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(139, 92, 246, 0.25), rgba(255, 255, 255, 0))',
+        'subtle': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+        'card': '0 1px 3px 0 rgba(0, 0, 0, 0.07), 0 1px 2px -1px rgba(0, 0, 0, 0.07)',
+        'elevated': '0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06)',
       }
     },
   },
