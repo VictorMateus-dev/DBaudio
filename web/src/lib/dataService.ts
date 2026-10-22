@@ -1,3 +1,4 @@
+import { SessionRequiredError } from './sessionError';
 import { validatePolicies, AlarmSample } from './noisePolicy';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { 
@@ -1315,7 +1316,7 @@ export const DataService = {
     const updated = policies.map(p => ({ ...p, threshold_db: p.warning_threshold_db, updated_at: new Date().toISOString() }));
     if (isSupabaseConfigured && supabase) {
       const { data: auth, error: authError } = await supabase.auth.getUser();
-      if (authError || !auth.user) throw new Error('Entre como síndico para salvar as políticas.');
+      if (authError || !auth.user) throw new SessionRequiredError();
       const { data: profile, error: profileError } = await supabase.from('profiles').select('role, condominium_id').eq('id', auth.user.id).single();
       if (profileError || profile?.role !== 'admin' || !profile.condominium_id) throw new Error('Somente o síndico pode alterar as políticas do condomínio.');
       const rows = updated.map(p => ({ ...p, condominium_id: profile.condominium_id }));
