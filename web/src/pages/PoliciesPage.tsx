@@ -30,7 +30,7 @@ export const PoliciesPage: React.FC<{ policies: NoisePolicy[]; onRefresh: () => 
     setSaving(true);
     try {
       await DataService.savePolicies(editable);
-      setDirty(false); setSuccess('Políticas salvas. Os modais do síndico e dos moradores usarão os limites de cada período.'); onRefresh();
+      setDirty(false); setSuccess('Políticas salvas. O modal na visão do morador usará os limites de cada período.'); onRefresh();
     } catch (e) { setNeedsLogin(e instanceof SessionRequiredError); setError(e instanceof Error ? e.message : 'Não foi possível salvar. Tente novamente.'); }
     finally { setSaving(false); }
   };

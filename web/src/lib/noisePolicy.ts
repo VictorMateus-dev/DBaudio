@@ -41,3 +41,12 @@ export function advanceEpisode(previous: AlarmEpisode | undefined, sample: Alarm
   if (!previous || previous.policyKey !== key || timestamp - previous.last > 30000 || timestamp < previous.last) return { apartmentId: sample.apartment_id, since: timestamp, last: timestamp, policyKey: key, dismissed: false, db: sample.decibel };
   return { ...previous, last: timestamp, db: sample.decibel };
 }
+
+export function noiseElapsed(since: number, now: number): { clock: string; text: string } {
+  const seconds = Math.max(0, Math.floor((now - since) / 1000));
+  const hours = Math.floor(seconds / 3600), minutes = Math.floor(seconds / 60) % 60, remaining = seconds % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const unit = (n: number, singular: string, plural: string) => n + ' ' + (n === 1 ? singular : plural);
+  const parts = [hours ? unit(hours, 'hora', 'horas') : '', minutes ? unit(minutes, 'minuto', 'minutos') : '', unit(remaining, 'segundo', 'segundos')].filter(Boolean);
+  return { clock: pad(hours) + ':' + pad(minutes) + ':' + pad(remaining), text: parts.join(' e ') };
+}
