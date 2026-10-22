@@ -1,3 +1,4 @@
+import { validatePolicies, AlarmSample } from './noisePolicy';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { 
   Apartment, Device, Sensor, NoiseReading, 
@@ -509,7 +510,7 @@ class LocalDataStore {
   apartments: Apartment[] = getStoredApartments();
   devices = [...initialDevices];
   sensors = [...initialSensors];
-  policies = [...initialPolicies];
+  policies: NoisePolicy[] = (() => { try { const raw = localStorage.getItem('dbsound_policies'); if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed) && !validatePolicies(parsed)) return parsed; } } catch {} return [...initialPolicies]; })();
   profiles: Profile[] = getStoredProfiles();
   alerts = [...initialAlerts];
   occurrences: Occurrence[] = getStoredOccurrences();
@@ -1297,26 +1298,49 @@ export const DataService = {
       : localStore.sensors;
   },
 
-  async getPolicies(): Promise<NoisePolicy[]> {
+  async getPolicies(condominiumId?: string): Promise<NoisePolicy[]> {
     if (isSupabaseConfigured && supabase) {
-      const { data } = await supabase.from('noise_policies').select('*').order('start_time');
-      if (data) return data as NoisePolicy[];
+      if (!condominiumId) return [];
+      const { data, error } = await supabase.from('noise_policies').select('*').eq('condominium_id', condominiumId).order('start_time');
+      if (error) throw new Error('Não foi possível carregar as políticas do Supabase.');
+      return data as NoisePolicy[];
     }
+    try { const raw = localStorage.getItem('dbsound_policies'); if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed) && !validatePolicies(parsed)) localStore.policies = parsed; } } catch {}
     return localStore.policies;
   },
 
-  async updatePolicy(policy: Partial<NoisePolicy> & { id: string }): Promise<boolean> {
+  async savePolicies(policies: NoisePolicy[]): Promise<void> {
+    const validation = validatePolicies(policies);
+    if (validation) throw new Error(validation);
+    const updated = policies.map(p => ({ ...p, threshold_db: p.warning_threshold_db, updated_at: new Date().toISOString() }));
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('noise_policies').update(policy).eq('id', policy.id);
-      return !error;
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw new Error('Entre como síndico para salvar as políticas.');
+      const { data: profile, error: profileError } = await supabase.from('profiles').select('role, condominium_id').eq('id', auth.user.id).single();
+      if (profileError || profile?.role !== 'admin' || !profile.condominium_id) throw new Error('Somente o síndico pode alterar as políticas do condomínio.');
+      const rows = updated.map(p => ({ ...p, condominium_id: profile.condominium_id }));
+      const { data, error } = await supabase.from('noise_policies').upsert(rows, { onConflict: 'id' }).select('id');
+      if (error || data?.length !== rows.length) throw new Error('O Supabase não confirmou o salvamento. Verifique as permissões de políticas de ruído.');
+      return;
     }
-    const idx = localStore.policies.findIndex(p => p.id === policy.id);
-    if (idx !== -1) {
-      localStore.policies[idx] = { ...localStore.policies[idx], ...policy, updated_at: new Date().toISOString() };
-      localStore.notify();
-      return true;
+    localStorage.setItem('dbsound_policies', JSON.stringify(updated));
+    localStore.policies = updated; localStore.notify();
+  },
+
+  async updatePolicy(policy: Partial<NoisePolicy> & { id: string }): Promise<boolean> {
+    const policies = await this.getPolicies(policy.condominium_id);
+    await this.savePolicies(policies.map(p => p.id === policy.id ? { ...p, ...policy } : p));
+    return true;
+  },
+
+  async getAlarmSamples(apartmentIds: string[]): Promise<AlarmSample[]> {
+    if (!apartmentIds.length) return [];
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('noise_readings').select('apartment_id,decibel,recorded_at').in('apartment_id', apartmentIds).gte('recorded_at', new Date(Date.now() - 30000).toISOString()).order('recorded_at', { ascending: false }).limit(500);
+      if (error) throw error;
+      return data as AlarmSample[];
     }
-    return false;
+    return localStore.readings.filter(r => apartmentIds.includes(r.apartment_id)).map(r => ({ apartment_id: r.apartment_id, decibel: r.decibel, recorded_at: r.recorded_at || r.created_at }));
   },
 
   async getAlerts(limit = 20): Promise<Alert[]> {

@@ -1,25 +1,28 @@
+import { activePolicy } from '../lib/noisePolicy';
 import React, { useState } from 'react';
 import { Bell, Clock, Wifi, Building, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { Alert } from '../types/database.types';
+import { Alert, NoisePolicy } from '../types/database.types';
 
 interface HeaderProps {
   alerts: Alert[];
+  policies: NoisePolicy[];
   onSelectApartment?: (apartmentId: string) => void;
   onClearAlerts?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ alerts, onSelectApartment }) => {
+export const Header: React.FC<HeaderProps> = ({ alerts, policies, onSelectApartment }) => {
   const { isDemoMode } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [showAlertDropdown, setShowAlertDropdown] = useState(false);
 
-  const now = new Date();
-  const hour = now.getHours();
-  const isNight = hour >= 22 || hour < 7;
-  const currentPolicyName = isNight ? 'Noturna (Lei do Silêncio)' : 'Diurna Comercial';
-  const currentThreshold = isNight ? '60 dB' : '70 dB';
+  const [now, setNow] = useState(new Date());
+  React.useEffect(() => { const timer = setInterval(() => setNow(new Date()), 10000); return () => clearInterval(timer); }, []);
+  const policy = activePolicy(policies, now);
+  const isNight = policy ? policy.start_time > policy.end_time : false;
+  const currentPolicyName = policy?.name || 'Sem política ativa';
+  const currentThreshold = policy ? 'Modal: ' + policy.critical_threshold_db + ' dB' : 'Configure os períodos';
 
   const unreadAlerts = alerts.filter(a => !a.read);
 
