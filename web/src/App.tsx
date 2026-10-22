@@ -1,4 +1,3 @@
-import { NoisePolicyAlarm } from './components/NoisePolicyAlarm';
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams, Outlet } from 'react-router-dom';
 import { Menu } from 'lucide-react';
@@ -325,7 +324,6 @@ export const App: React.FC = () => {
 
   return (
     <>
-    {user?.role === 'admin' && <NoisePolicyAlarm apartments={apartments} policies={policies} />}
     <Routes>
       
       <Route
