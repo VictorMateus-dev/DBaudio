@@ -1,3 +1,4 @@
+import { isSupabaseConfigured } from '../lib/supabaseClient';
 import React, { useState } from 'react';
 import { 
   Volume2, Lock, Mail, ArrowRight, ShieldCheck, User, Phone, 
@@ -12,8 +13,8 @@ export const LoginPage: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
 
-  const [loginEmail, setLoginEmail] = useState('admin@dbsound.com');
-  const [loginPassword, setLoginPassword] = useState('Admin@123456');
+  const [loginEmail, setLoginEmail] = useState(isSupabaseConfigured ? '' : 'admin@dbsound.com');
+  const [loginPassword, setLoginPassword] = useState(isSupabaseConfigured ? '' : 'Admin@123456');
   const [showPassword, setShowPassword] = useState(false);
 
   const [fullName, setFullName] = useState('');
@@ -191,8 +192,9 @@ export const LoginPage: React.FC = () => {
             </button>
           </div>
 
+          {isSupabaseConfigured && <p className="text-xs text-slate-600">Use a conta cadastrada no Supabase. Acesso administrativo exige perfil de síndico vinculado ao condomínio.</p>}
           {/* Atalhos Rápidos para Demonstração */}
-          {activeTab === 'login' && (
+          {activeTab === 'login' && !isSupabaseConfigured && (
             <div className="flex items-center justify-between text-xs bg-slate-50 border border-slate-200/80 p-2.5 rounded-xl">
               <span className="text-slate-500 font-medium text-[11px]">Acessos Rápidos:</span>
               <div className="flex gap-1.5">

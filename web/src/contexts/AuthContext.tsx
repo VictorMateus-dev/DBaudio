@@ -244,16 +244,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
       });
 
-      const { data: authListener } = client.auth.onAuthStateChange(async (_event, session) => {
-        if (session?.user) {
-          await fetchProfile(session.user.id, session.user.email, session.user.user_metadata?.full_name);
-        } else {
-          setUser(null);
-        }
-        setIsLoading(false);
+      let disposed = false;
+      const { data: authListener } = client.auth.onAuthStateChange((_event, session) => {
+        if (!session?.user) { setUser(null); setIsLoading(false); return; }
+        setTimeout(() => {
+          if (disposed) return;
+          void fetchProfile(session.user.id, session.user.email, session.user.user_metadata?.full_name)
+            .catch(() => { if (!disposed) setUser(null); })
+            .finally(() => { if (!disposed) setIsLoading(false); });
+        }, 0);
       });
 
       return () => {
+        disposed = true;
         authListener.subscription.unsubscribe();
       };
     } else {
@@ -286,8 +289,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               message: 'E-mail não confirmado! Por favor, acesse sua caixa de entrada e clique no link de ativação enviado pelo Supabase.',
             };
           }
-          console.warn('Supabase signIn falhou, tentando autenticação de conta local/demo:', error.message);
+          setUser(null); setRole('resident');
+          return { success: false, message: 'O Supabase não autenticou essa conta. Confira o e-mail e a senha em Authentication. As contas de demonstração funcionam somente no ambiente local.' };
         }
+        setUser(null);
+        return { success: false, message: 'Não foi possível criar uma sessão no Supabase. Tente entrar novamente.' };
       }
 
       const allProfiles = await DataService.getProfiles();
@@ -295,7 +301,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (foundInStore) {
         setUser(foundInStore);
         setRole(foundInStore.role);
-        setIsDemoMode(false);
+        setIsDemoMode(true);
         return { success: true };
       }
 
@@ -317,14 +323,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStore.saveProfile(resProf);
         setUser(resProf);
         setRole('resident');
-        setIsDemoMode(false);
+        setIsDemoMode(true);
         return { success: true };
       }
 
       if (cleanEmail === 'admin@dbsound.com' || cleanEmail.includes('admin') || targetRole === 'admin') {
         setUser(defaultAdminProfile);
         setRole('admin');
-        setIsDemoMode(false);
+        setIsDemoMode(true);
         return { success: true };
       }
 

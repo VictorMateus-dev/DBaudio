@@ -1,3 +1,5 @@
+import { SessionRequiredError } from '../lib/sessionError';
+import { useNavigate } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import type { NoisePolicy } from '../types/database.types';
 import { DataService } from '../lib/dataService';
@@ -5,7 +7,9 @@ import { activePolicy, validatePolicies } from '../lib/noisePolicy';
 import { useAuth } from '../contexts/AuthContext';
 
 export const PoliciesPage: React.FC<{ policies: NoisePolicy[]; onRefresh: () => void; loadError?: string }> = ({ policies, onRefresh, loadError }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [needsLogin, setNeedsLogin] = useState(false);
   const defaults = (): NoisePolicy[] => [
     { name: 'Período diurno', start_time: '07:00', end_time: '22:00', warning_threshold_db: 70, critical_threshold_db: 80 },
     { name: 'Período noturno', start_time: '22:00', end_time: '07:00', warning_threshold_db: 60, critical_threshold_db: 70 },
@@ -19,7 +23,7 @@ export const PoliciesPage: React.FC<{ policies: NoisePolicy[]; onRefresh: () => 
     setEditable(previous => previous.map(p => p.id === id ? { ...p, [field]: value } : p));
   };
   const save = async (e: React.FormEvent) => {
-    e.preventDefault(); setError(''); setSuccess('');
+    e.preventDefault(); setError(''); setSuccess(''); setNeedsLogin(false);
     if (loadError) { setError(loadError); return; }
     const validation = validatePolicies(editable);
     if (validation) { setError(validation); return; }
@@ -27,7 +31,7 @@ export const PoliciesPage: React.FC<{ policies: NoisePolicy[]; onRefresh: () => 
     try {
       await DataService.savePolicies(editable);
       setDirty(false); setSuccess('Políticas salvas. Os modais do síndico e dos moradores usarão os limites de cada período.'); onRefresh();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível salvar. Tente novamente.'); }
+    } catch (e) { setNeedsLogin(e instanceof SessionRequiredError); setError(e instanceof Error ? e.message : 'Não foi possível salvar. Tente novamente.'); }
     finally { setSaving(false); }
   };
   const current = activePolicy(policies);
@@ -44,6 +48,7 @@ export const PoliciesPage: React.FC<{ policies: NoisePolicy[]; onRefresh: () => 
     </div>
     {loadError && <p role="alert" className="rounded-xl bg-rose-50 p-4 text-rose-800">{loadError} O salvamento ficará indisponível até carregar a configuração existente.</p>}
     {error && <p role="alert" className="rounded-xl bg-rose-50 border border-rose-200 p-4 text-rose-800">{error}</p>}
+    {needsLogin && <button type="button" className="rounded-xl bg-blue-600 px-4 py-2 text-white" onClick={async () => { await logout(); navigate('/login', { replace: true }); }}>Entrar novamente no Supabase</button>}
     {success && <p role="status" className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800">{success}</p>}
     <fieldset disabled={saving} className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {editable.map(p => <section key={p.id} className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
