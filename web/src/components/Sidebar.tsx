@@ -1,7 +1,6 @@
 import React from 'react';
 import { 
   LayoutDashboard, 
-  Grid3X3, 
   AlertTriangle, 
   Cpu, 
   Sliders, 
@@ -18,7 +17,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 
-export type NavTab = 'overview' | 'floorplan' | 'residents' | 'occurrences' | 'devices' | 'policies' | 'simulator';
+export type NavTab = 'overview' | 'residents' | 'occurrences' | 'devices' | 'policies' | 'simulator';
 
 interface SidebarProps {
   currentTab: NavTab;
@@ -58,7 +57,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'MONITORAMENTO',
       items: [
         { id: 'overview', label: 'Painel Geral', icon: LayoutDashboard },
-        { id: 'floorplan', label: 'Planta das Unidades', icon: Grid3X3 },
       ]
     },
     {

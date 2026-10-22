@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { FloorPlanGrid } from '../components/FloorPlanGrid';
+import { FloorPlanGrid } from './FloorPlanGrid';
 import { Apartment } from '../types/database.types';
-import { Search, Filter, RefreshCw } from 'lucide-react';
+import { Search, RefreshCw } from 'lucide-react';
 
-interface FloorPlanPageProps {
+interface ApartmentMapProps {
   apartments: Apartment[];
   onSelectApartment: (apt: Apartment) => void;
   onRefresh?: () => void;
 }
 
-export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
+export const ApartmentMap: React.FC<ApartmentMapProps> = ({
   apartments,
   onSelectApartment,
   onRefresh,
@@ -24,12 +24,12 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
   });
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6" aria-label="Planta e filtros das unidades">
       
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Planta Geral dos Apartamentos</h1>
+          <h2 className="text-lg font-bold tracking-tight text-slate-900">Planta das Unidades</h2>
           <p className="text-sm text-slate-500">
             Mapeamento acústico em tempo real por andar e unidade residencial.
           </p>
@@ -42,6 +42,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
+              aria-label="Buscar unidade"
               placeholder="Buscar unidade (ex: 202)..."
               value={searchNumber}
               onChange={(e) => setSearchNumber(e.target.value)}
@@ -49,8 +50,9 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
             />
           </div>
 
-          <div className="flex items-center space-x-1 bg-white border border-slate-200 rounded-lg p-1 text-xs shadow-subtle">
+          <div className="flex flex-wrap items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 text-xs shadow-subtle">
             <button
+              aria-pressed={filterStatus === 'all'}
               onClick={() => setFilterStatus('all')}
               className={`px-3 py-1.5 rounded-md font-medium transition ${
                 filterStatus === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
@@ -59,6 +61,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
               Todos
             </button>
             <button
+              aria-pressed={filterStatus === 'normal'}
               onClick={() => setFilterStatus('normal')}
               className={`px-3 py-1.5 rounded-md font-medium transition ${
                 filterStatus === 'normal' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
@@ -67,6 +70,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
               Normal
             </button>
             <button
+              aria-pressed={filterStatus === 'warning'}
               onClick={() => setFilterStatus('warning')}
               className={`px-3 py-1.5 rounded-md font-medium transition ${
                 filterStatus === 'warning' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
@@ -75,6 +79,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
               Atenção
             </button>
             <button
+              aria-pressed={filterStatus === 'critical'}
               onClick={() => setFilterStatus('critical')}
               className={`px-3 py-1.5 rounded-md font-medium transition ${
                 filterStatus === 'critical' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
@@ -82,6 +87,7 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
             >
               Elevado
             </button>
+            <button aria-pressed={filterStatus === 'offline'} onClick={() => setFilterStatus('offline')} className={`px-3 py-1.5 rounded-md font-medium transition ${filterStatus === 'offline' ? 'bg-slate-700 text-white' : 'text-slate-600 hover:text-slate-900'}`}>Offline</button>
           </div>
 
           {onRefresh && (
@@ -97,10 +103,11 @@ export const FloorPlanPage: React.FC<FloorPlanPageProps> = ({
       </div>
 
       
-      <FloorPlanGrid
+      {filteredApartments.length === 0 && <p role="status" className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">Nenhuma unidade encontrada para os filtros selecionados.</p>}
+      {filteredApartments.length > 0 && <FloorPlanGrid
         apartments={filteredApartments}
         onSelectApartment={onSelectApartment}
-      />
+      />}
     </div>
   );
 };

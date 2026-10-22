@@ -58,7 +58,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
           className="flex items-center space-x-2 text-sm text-slate-500 hover:text-slate-900 transition group w-fit font-medium"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition" />
-          <span>Voltar para Planta</span>
+          <span>Voltar ao Painel Geral</span>
         </button>
 
         <div className="flex items-center space-x-3">

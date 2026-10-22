@@ -1,6 +1,6 @@
 import React from 'react';
 import { StatCard } from '../components/StatCard';
-import { FloorPlanGrid } from '../components/FloorPlanGrid';
+import { ApartmentMap } from '../components/ApartmentMap';
 import { NoiseChart } from '../components/NoiseChart';
 import { Apartment, Alert, Occurrence, Device } from '../types/database.types';
 import { 
@@ -8,9 +8,7 @@ import {
   Wifi, 
   WifiOff, 
   AlertCircle, 
-  VolumeX, 
   Flame, 
-  CheckCircle2, 
   ArrowRight,
   TrendingUp,
 } from 'lucide-react';
@@ -23,6 +21,7 @@ interface DashboardOverviewProps {
   occurrences: Occurrence[];
   onNavigateTab: (tab: NavTab) => void;
   onSelectApartment: (apartment: Apartment) => void;
+  onRefresh: () => void;
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -32,6 +31,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   occurrences,
   onNavigateTab,
   onSelectApartment,
+  onRefresh,
 }) => {
   const onlineDevicesCount = devices.filter(d => d.status === 'online').length;
   const offlineDevicesCount = devices.filter(d => d.status === 'offline').length;
@@ -46,9 +46,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Painel de Monitoramento Síndico</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Painel Geral</h1>
           <p className="text-sm text-slate-500">
-            Visão consolidada em tempo real da acústica predial e ocorrências condominiais.
+            Indicadores, planta das unidades e acompanhamento acústico em uma única página.
           </p>
         </div>
 
@@ -68,7 +68,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         <StatCard
           title="Apartamentos"
           value={apartments.length}
-          subtitle="9 monitorados (Bloco A)"
+          subtitle={`${apartments.length} unidades no painel`}
           icon={Building2}
           color="blue"
         />
@@ -109,29 +109,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         />
       </div>
 
-      {/* Main Grid: Floorplan/Chart + Right Panels */}
+      <ApartmentMap apartments={apartments} onSelectApartment={onSelectApartment} onRefresh={onRefresh} />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Left 2 Cols: FloorPlan + Chart */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <span>Planta dos Apartamentos</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            </h2>
-            <button
-              onClick={() => onNavigateTab('floorplan')}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-            >
-              Ver mapa expandido <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <FloorPlanGrid
-            apartments={apartments}
-            onSelectApartment={onSelectApartment}
-          />
-
           <NoiseChart
             data={[
               { time: '18:00', decibel: 48 },
