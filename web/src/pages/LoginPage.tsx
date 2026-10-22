@@ -13,8 +13,8 @@ export const LoginPage: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
 
-  const [loginEmail, setLoginEmail] = useState(isSupabaseConfigured ? '' : 'admin@dbsound.com');
-  const [loginPassword, setLoginPassword] = useState(isSupabaseConfigured ? '' : 'Admin@123456');
+  const [loginEmail, setLoginEmail] = useState('admin@dbsound.com');
+  const [loginPassword, setLoginPassword] = useState('Admin@123456');
   const [showPassword, setShowPassword] = useState(false);
 
   const [fullName, setFullName] = useState('');
