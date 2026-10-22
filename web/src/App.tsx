@@ -5,7 +5,6 @@ import { Menu } from 'lucide-react';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardOverview } from './pages/DashboardOverview';
-import { FloorPlanPage } from './pages/FloorPlanPage';
 import { ApartmentDetailPage } from './pages/ApartmentDetailPage';
 import { OccurrencesPage } from './pages/OccurrencesPage';
 import { DevicesPage } from './pages/DevicesPage';
@@ -68,10 +67,10 @@ const ApartmentDetailRouteWrapper: React.FC<{
       <div className="p-8 text-center text-slate-400 text-xs">
         <span>Apartamento não encontrado.</span>
         <button
-          onClick={() => navigate('/sindico/apartamentos')}
+          onClick={() => navigate('/sindico/dashboard')}
           className="ml-2 text-violet-400 hover:text-violet-300 font-semibold underline"
         >
-          Voltar para unidades
+          Voltar ao Painel Geral
         </button>
       </div>
     );
@@ -84,7 +83,7 @@ const ApartmentDetailRouteWrapper: React.FC<{
       sensors={sensors.filter(s => s.device_id === apt.id)}
       occurrences={occurrences}
       alerts={alerts}
-      onBack={() => navigate('/sindico/apartamentos')}
+      onBack={() => navigate('/sindico/dashboard')}
       onOpenSimulator={(aptId) => {
         onOpenSimulator(aptId);
         navigate('/sindico/simulador');
@@ -112,8 +111,8 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
 
   const path = location.pathname;
   let currentTab: NavTab = 'overview';
-  if (path.includes('/sindico/apartamento')) currentTab = 'floorplan';
-  else if (path.includes('/sindico/apartamentos')) currentTab = 'floorplan';
+  if (path.includes('/sindico/apartamento')) currentTab = 'overview';
+  else if (path.includes('/sindico/apartamentos')) currentTab = 'overview';
   else if (path.includes('/sindico/moradores')) currentTab = 'residents';
   else if (path.includes('/sindico/ocorrencias')) currentTab = 'occurrences';
   else if (path.includes('/sindico/dispositivos')) currentTab = 'devices';
@@ -124,7 +123,6 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
   const handleSelectTab = (tab: NavTab) => {
     switch (tab) {
       case 'overview': navigate('/sindico/dashboard'); break;
-      case 'floorplan': navigate('/sindico/apartamentos'); break;
       case 'residents': navigate('/sindico/moradores'); break;
       case 'occurrences': navigate('/sindico/ocorrencias'); break;
       case 'devices': navigate('/sindico/dispositivos'); break;
@@ -365,6 +363,7 @@ export const App: React.FC = () => {
           path="dashboard"
           element={
             <DashboardOverview
+              onRefresh={loadAllData}
               apartments={apartments}
               devices={devices}
               alerts={alerts}
@@ -372,7 +371,6 @@ export const App: React.FC = () => {
               onNavigateTab={(tab) => {
                 switch (tab) {
                   case 'overview': navigate('/sindico/dashboard'); break;
-                  case 'floorplan': navigate('/sindico/apartamentos'); break;
                   case 'residents': navigate('/sindico/moradores'); break;
                   case 'occurrences': navigate('/sindico/ocorrencias'); break;
                   case 'devices': navigate('/sindico/dispositivos'); break;
@@ -387,18 +385,7 @@ export const App: React.FC = () => {
           }
         />
 
-        <Route
-          path="apartamentos"
-          element={
-            <FloorPlanPage
-              apartments={apartments}
-              onSelectApartment={(apt) => {
-                navigate(`/sindico/apartamento/${apt.id}`);
-              }}
-              onRefresh={loadAllData}
-            />
-          }
-        />
+        <Route path="apartamentos" element={<Navigate to="/sindico/dashboard" replace />} />
 
         <Route
           path="apartamento/:id"
