@@ -29,11 +29,10 @@ import {
   EyeOff, 
   Send, 
   ShieldAlert,
-  MessageSquare,
   Sun,
   Moon
 } from 'lucide-react';
-import { Apartment, Alert, Occurrence, SimulatedFine, OccurrenceStatus, Conversation, ConversationMessage } from '../types/database.types';
+import { Apartment, Alert, Occurrence, SimulatedFine, OccurrenceStatus } from '../types/database.types';
 import { DataService, localStore } from '../lib/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -54,23 +53,11 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
 }) => {
   const { user, switchRole, refreshProfile, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'home' | 'history' | 'messages' | 'occurrences' | 'profile' | 'privacy'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'history' | 'occurrences' | 'profile' | 'privacy'>('home');
   const [occSubTab, setOccSubTab] = useState<'new' | 'notices' | 'my_reports'>('new');
   const [activeModalAlert, setActiveModalAlert] = useState<Alert | null>(null);
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
   const [isPhoneFrame, setIsPhoneFrame] = useState<boolean>(false);
-
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const selectedConversationRef = React.useRef<Conversation | null>(null);
-  useEffect(() => {
-    selectedConversationRef.current = selectedConversation;
-  }, [selectedConversation]);
-
-  const [activeMessages, setActiveMessages] = useState<ConversationMessage[]>([]);
-  const [residentReplyText, setResidentReplyText] = useState('');
-  const [isSendingReply, setIsSendingReply] = useState(false);
-  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
 
   const [newType, setNewType] = useState('Música Alta / Som Excessivo');
   const [targetAptId, setTargetAptId] = useState<string>('');
@@ -118,19 +105,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
           const fines = await DataService.getFinesByApartment(effectiveApt.id);
           setUnitFines(fines);
 
-          const convs = await DataService.getConversations(effectiveApt.id);
-          setConversations(convs);
-          const unread = await DataService.getUnreadMessagesCount(effectiveApt.id, false);
-          setUnreadMessagesCount(unread);
-
-          if (selectedConversation) {
-            const updated = convs.find(c => c.id === selectedConversation.id);
-            if (updated) {
-              setSelectedConversation(updated);
-              const msgs = await DataService.getMessages(updated.id);
-              setActiveMessages(msgs);
-            }
-          }
         }
         const occs = await DataService.getOccurrences();
         setAllOccurrencesList(occs);
@@ -144,87 +118,8 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
       fetchData();
     });
 
-    const unsubRealtime = DataService.subscribeToChatRealtime((event) => {
-      if (event.type === 'INSERT' && event.message) {
-        const newMsg = event.message;
-        const currentOpenConv = selectedConversationRef.current;
-        if (currentOpenConv && newMsg.conversation_id === currentOpenConv.id) {
-          setActiveMessages(prev => {
-            if (prev.some(m => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
-          });
-          if (newMsg.sender_id !== user?.id) {
-            DataService.markMessagesAsRead(newMsg.conversation_id, user?.id);
-          }
-        } else {
-          fetchData();
-        }
-      } else if (event.type === 'UPDATE' && event.message) {
-        const updatedMsg = event.message;
-        const currentOpenConv = selectedConversationRef.current;
-        if (currentOpenConv && updatedMsg.conversation_id === currentOpenConv.id) {
-          setActiveMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
-        }
-      } else if (event.type === 'READ_RECEIPT' && event.conversation_id) {
-        const currentOpenConv = selectedConversationRef.current;
-        if (currentOpenConv && event.conversation_id === currentOpenConv.id) {
-          setActiveMessages(prev => prev.map(m => (!m.read_at && m.sender_id === user?.id) ? { ...m, read: true, read_at: event.read_at || new Date().toISOString() } : m));
-        }
-      }
-    });
-
-    return () => {
-      unsubLocal();
-      unsubRealtime();
-    };
-  }, [effectiveApt.id, selectedConversation?.id, user?.id]);
-
-  const handleOpenConversation = async (conv: Conversation) => {
-    setSelectedConversation(conv);
-    const msgs = await DataService.getMessages(conv.id);
-    setActiveMessages(msgs);
-    await DataService.markMessagesAsRead(conv.id, user?.id);
-    const unread = await DataService.getUnreadMessagesCount(effectiveApt.id !== 'unassigned' ? effectiveApt.id : undefined, false);
-    setUnreadMessagesCount(unread);
-  };
-
-  const handleSendResidentReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedConversation || !residentReplyText.trim() || isSendingReply) return;
-
-    setIsSendingReply(true);
-    try {
-      const msg = await DataService.sendMessage({
-        conversation_id: selectedConversation.id,
-        sender_id: user?.id || 'morador-' + effectiveApt.number,
-        recipient_id: selectedConversation.created_by || 'admin-sindico',
-        sender_name: user?.full_name || `Morador Apto ${effectiveApt.number}`,
-        sender_role: 'resident',
-        content: residentReplyText.trim(),
-        message: residentReplyText.trim(),
-      });
-      setActiveMessages(prev => [...prev, msg]);
-      setResidentReplyText('');
-    } finally {
-      setIsSendingReply(false);
-    }
-  };
-
-  const handleOpenConversationByOccurrence = async (occ: Occurrence) => {
-    let conv = await DataService.getConversationByOccurrenceId(occ.id);
-    if (!conv) {
-      conv = await DataService.createConversation({
-        condominium_id: occ.condominium_id || user?.condominium_id || '00000000-0000-0000-0000-000000000001',
-        apartment_id: effectiveApt.id,
-        occurrence_id: occ.id,
-        type: 'ocorrencia',
-        subject: `Ocorrência #${occ.id.slice(0, 8)} • ${occ.type}`,
-        initial_message: `Olá síndico! Gostaria de conversar a respeito da notificação da ocorrência de ${occ.type}.`,
-      });
-    }
-    setActiveTab('messages');
-    await handleOpenConversation(conv);
-  };
+    return () => { unsubLocal(); };
+  }, [effectiveApt.id, user?.id]);
 
   useEffect(() => {
     const unreadCritical = alerts.find(a => 
@@ -570,170 +465,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
             </div>
           )}
 
-          {/* ABA MENSAGENS */}
-          {activeTab === 'messages' && (
-            <div className="space-y-3 text-xs flex flex-col h-full animate-fadeIn">
-              {selectedConversation ? (
-                <div className="flex flex-col space-y-3">
-                  
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedConversation(null)}
-                      className="text-brand-600 hover:text-brand-700 text-xs font-semibold flex items-center gap-1"
-                    >
-                      <span>← Conversas</span>
-                    </button>
-
-                    <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold ${
-                      selectedConversation.type === 'preventivo'
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                        : 'bg-blue-50 text-brand-700 border border-blue-200'
-                    }`}>
-                      {selectedConversation.type === 'preventivo' ? 'Contato Preventivo' : 'Ocorrência'}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-xs">{selectedConversation.subject}</h4>
-                    <p className="text-[10px] text-slate-500">Canal direto com a Administração do condomínio</p>
-                  </div>
-
-                  {/* Banner de Contexto */}
-                  <div className={`p-2.5 rounded-xl text-[11px] leading-relaxed ${
-                    selectedConversation.type === 'preventivo'
-                      ? 'bg-amber-50 border border-amber-200 text-amber-800'
-                      : 'bg-blue-50 border border-blue-200 text-brand-800'
-                  }`}>
-                    {selectedConversation.type === 'preventivo'
-                      ? 'Diálogo educativo baseado no monitoramento acústico predial. Esta mensagem não gera denúncia nem penalidade formal.'
-                      : 'Comunicação direta referente à ocorrência registrada. O anonimato do denunciante permanece 100% blindado.'}
-                  </div>
-
-                  {/* Thread de Mensagens */}
-                  <div className="space-y-2.5 max-h-[320px] overflow-y-auto p-3 bg-slate-50 border border-slate-200/80 rounded-2xl">
-                    {activeMessages.length === 0 ? (
-                      <p className="text-center py-6 text-slate-400 text-[11px]">Nenhuma mensagem nesta conversa.</p>
-                    ) : (
-                      activeMessages.map(msg => {
-                        const isMe = user?.id ? msg.sender_id === user.id : msg.sender_role === 'resident';
-                        return (
-                          <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                            <div className="flex items-center gap-1.5 mb-0.5 text-[9px] text-slate-400">
-                              <span className={isMe ? 'text-brand-600 font-semibold' : 'text-slate-700 font-semibold'}>
-                                {isMe ? 'Você' : (msg.sender_name || 'Síndico Geral')}
-                              </span>
-                              <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                            <div className={`p-2.5 rounded-2xl text-[11px] max-w-[85%] leading-relaxed ${
-                              isMe
-                                ? 'bg-brand-600 text-white rounded-tr-none shadow-sm'
-                                : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-sm'
-                            }`}>
-                              <p className="whitespace-pre-wrap">{msg.content || msg.message}</p>
-                            </div>
-                            {isMe && (
-                              <div className="text-[9px] text-slate-400 mt-0.5 flex items-center gap-1">
-                                <span>{msg.read_at ? 'Visualizada' : 'Enviada'}</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* Form de Envio */}
-                  <form onSubmit={handleSendResidentReply} className="flex gap-2 pt-1">
-                    <input
-                      type="text"
-                      value={residentReplyText}
-                      onChange={e => setResidentReplyText(e.target.value)}
-                      placeholder="Responder ao síndico..."
-                      className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition shadow-sm"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isSendingReply || !residentReplyText.trim()}
-                      className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs flex items-center gap-1 disabled:opacity-50 transition shadow-sm"
-                    >
-                      <Send className="w-3 h-3" />
-                      <span>{isSendingReply ? '...' : 'Enviar'}</span>
-                    </button>
-                  </form>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 block">Central de Mensagens</span>
-                      <p className="text-[10px] text-slate-500">Comunicações com a Administração ({effectiveApt.number})</p>
-                    </div>
-                    {unreadMessagesCount > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                        <span>{unreadMessagesCount} nova(s)</span>
-                      </span>
-                    )}
-                  </div>
-
-                  {conversations.length === 0 ? (
-                    <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                      <MessageSquare className="w-8 h-8 text-slate-300 mx-auto" />
-                      <p className="font-semibold text-slate-900 text-xs">Caixa de entrada vazia</p>
-                      <p className="text-[11px] text-slate-500">
-                        Quando o síndico entrar em contato preventivamente ou para tratar de uma ocorrência, as mensagens aparecerão aqui.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {conversations.map(conv => (
-                        <div
-                          key={conv.id}
-                          onClick={() => handleOpenConversation(conv)}
-                          className={`p-3 rounded-2xl border transition cursor-pointer relative ${
-                            conv.unread_count && conv.unread_count > 0
-                              ? 'bg-white border-brand-500 shadow-md ring-1 ring-brand-500'
-                              : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-subtle'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold ${
-                              conv.type === 'preventivo'
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : 'bg-blue-50 text-brand-700 border border-blue-200'
-                            }`}>
-                              {conv.type === 'preventivo' ? 'Contato Preventivo' : 'Ocorrência'}
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              {new Date(conv.updated_at || conv.created_at).toLocaleDateString('pt-BR')}
-                            </span>
-                          </div>
-
-                          <h5 className="font-semibold text-slate-900 text-xs mt-1 mb-0.5">{conv.subject}</h5>
-
-                          {conv.last_message && (
-                            <p className="text-[11px] text-slate-500 line-clamp-1">
-                              {conv.last_message}
-                            </p>
-                          )}
-
-                          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 mt-1 border-t border-slate-100">
-                            <span className="flex items-center gap-1 text-brand-600 font-medium">
-                              <MessageSquare className="w-3 h-3" />
-                              <span>Toque para responder ao síndico</span>
-                            </span>
-                            <ChevronRight className="w-3 h-3 text-slate-400" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* ABA OCORRÊNCIAS */}
           {activeTab === 'occurrences' && (
             <div className="space-y-3 text-xs">
@@ -975,7 +706,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                            <div className="grid grid-cols-1 gap-2 pt-1 border-t border-slate-100">
                               <button
                                 type="button"
                                 onClick={() => setSelectedFineForModal(fine)}
@@ -983,22 +714,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                               >
                                 <FileText className="w-3 h-3 text-slate-500" />
                                 <span>Ver Boleto</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const linkedOcc = allOccurrencesList.find(o => o.id === fine.occurrence_id);
-                                  if (linkedOcc) {
-                                    handleOpenConversationByOccurrence(linkedOcc);
-                                  } else {
-                                    setActiveTab('messages');
-                                  }
-                                }}
-                                className="py-2 px-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-brand-700 font-semibold text-xs flex items-center justify-center gap-1 transition"
-                              >
-                                <MessageSquare className="w-3 h-3 text-brand-600" />
-                                <span>Falar com Síndico</span>
                               </button>
                             </div>
                           </div>
@@ -1062,15 +777,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                                 </p>
                               )}
                             </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleOpenConversationByOccurrence(notif)}
-                              className="w-full py-2 px-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-brand-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
-                            >
-                              <MessageSquare className="w-3.5 h-3.5 text-brand-600" />
-                              <span>Conversar com o Síndico sobre este Aviso</span>
-                            </button>
 
                             <span className="text-[10px] text-slate-400 italic block">
                               A identidade de eventuais denunciantes é rigorosamente protegida.
@@ -1252,26 +958,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
             <History className="w-4 h-4 mb-0.5" />
             <span>Histórico</span>
           </button>
-          <button
-            onClick={() => {
-              setActiveTab('messages');
-              setSelectedConversation(null);
-            }}
-            className={`flex flex-col items-center text-[10px] relative transition ${
-              activeTab === 'messages' ? 'text-brand-600 font-semibold' : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <div className="relative">
-              <MessageSquare className="w-4 h-4 mb-0.5" />
-              {unreadMessagesCount > 0 && (
-                <span className="absolute -top-1 -right-2 w-2 h-2 bg-rose-500 rounded-full animate-ping"></span>
-              )}
-              {unreadMessagesCount > 0 && (
-                <span className="absolute -top-1 -right-2 w-2 h-2 bg-rose-500 rounded-full"></span>
-              )}
-            </div>
-            <span>Mensagens</span>
-          </button>
+
           <button
             onClick={() => setActiveTab('occurrences')}
             className={`flex flex-col items-center text-[10px] transition ${

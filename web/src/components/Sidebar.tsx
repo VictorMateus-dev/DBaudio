@@ -10,7 +10,6 @@ import {
   Users,
   LogOut,
   UserCheck,
-  MessageSquare,
   Activity,
   X,
   Sun,
@@ -19,7 +18,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 
-export type NavTab = 'overview' | 'floorplan' | 'residents' | 'occurrences' | 'messages' | 'devices' | 'policies' | 'simulator';
+export type NavTab = 'overview' | 'floorplan' | 'residents' | 'occurrences' | 'devices' | 'policies' | 'simulator';
 
 interface SidebarProps {
   currentTab: NavTab;
@@ -27,7 +26,6 @@ interface SidebarProps {
   openAlertsCount: number;
   openOccurrencesCount: number;
   pendingResidentsCount?: number;
-  unreadMessagesCount?: number;
   onClose?: () => void;
 }
 
@@ -50,7 +48,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   openAlertsCount,
   openOccurrencesCount,
   pendingResidentsCount = 0,
-  unreadMessagesCount = 0,
   onClose,
 }) => {
   const { role, user, logout } = useAuth();
@@ -80,13 +77,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: Users, 
           badge: pendingResidentsCount, 
           badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
-        },
-        { 
-          id: 'messages', 
-          label: 'Central de Mensagens', 
-          icon: MessageSquare, 
-          badge: unreadMessagesCount, 
-          badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30' 
         },
       ]
     },

@@ -1,19 +1,17 @@
 import React from 'react';
 import { Apartment } from '../types/database.types';
-import { WifiOff, ChevronRight, Activity, MessageSquare, Sun, Moon } from 'lucide-react';
+import { WifiOff, ChevronRight, Activity, Sun, Moon } from 'lucide-react';
 
 interface FloorPlanGridProps {
   apartments: Apartment[];
   onSelectApartment: (apartment: Apartment) => void;
   selectedApartmentId?: string;
-  onPreventiveContact?: (apartment: Apartment) => void;
 }
 
 export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
   apartments,
   onSelectApartment,
   selectedApartmentId,
-  onPreventiveContact,
 }) => {
   const detectedFloors = Array.from(new Set(apartments.map(a => a.floor || 1))).sort((a, b) => b - a);
   const floors = detectedFloors.length > 0 ? detectedFloors : [1];
@@ -181,22 +179,7 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-[11px] pt-1">
-                          {onPreventiveContact ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onPreventiveContact(apt);
-                              }}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[10px] font-semibold transition"
-                              title="Iniciar diálogo preventivo diretamente pelo monitoramento acústico"
-                            >
-                              <MessageSquare className="w-3 h-3 text-blue-600" />
-                              <span>Contatar</span>
-                            </button>
-                          ) : (
-                            <span className="text-slate-400 text-[10px]">3 sensores calibrados</span>
-                          )}
+                          <span className="text-slate-400 text-[10px]">3 sensores calibrados</span>
 
                           <span className="flex items-center text-blue-600 hover:text-blue-700 font-medium transition ml-auto">
                             Inspecionar <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
