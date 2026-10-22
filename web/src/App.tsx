@@ -1,3 +1,4 @@
+import { NoisePolicyAlarm } from './components/NoisePolicyAlarm';
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams, Outlet } from 'react-router-dom';
 import { Menu } from 'lucide-react';
@@ -93,12 +94,14 @@ const ApartmentDetailRouteWrapper: React.FC<{
 };
 
 interface SindicoLayoutProps {
+  policies: NoisePolicy[];
   alerts: Alert[];
   occurrences: Occurrence[];
   pendingResidentsCount: number;
 }
 
 const SindicoLayout: React.FC<SindicoLayoutProps> = ({
+  policies,
   alerts,
   occurrences,
   pendingResidentsCount,
@@ -183,6 +186,7 @@ const SindicoLayout: React.FC<SindicoLayoutProps> = ({
       
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
         <Header
+          policies={policies}
           alerts={alerts}
           onSelectApartment={(aptId) => {
             navigate(`/sindico/apartamento/${aptId}`);
@@ -207,6 +211,7 @@ export const App: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [policies, setPolicies] = useState<NoisePolicy[]>([]);
+  const [policiesError, setPoliciesError] = useState('');
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [simulatorAptId, setSimulatorAptId] = useState<string | undefined>(undefined);
 
@@ -217,7 +222,7 @@ export const App: React.FC = () => {
       DataService.getSensors(),
       DataService.getAlerts(),
       DataService.getOccurrences(),
-      DataService.getPolicies(),
+      DataService.getPolicies(user?.condominium_id).then(data => { setPoliciesError(''); return data; }).catch(error => { setPoliciesError(error.message); return []; }),
       DataService.getProfiles(),
     ]);
     setApartments([...apts]);
@@ -237,7 +242,7 @@ export const App: React.FC = () => {
     });
 
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'dbsound_apartments' || e.key === 'dbsound_allocations' || e.key === 'dbsound_profiles' || e.key === 'dbsound_conversations' || e.key === 'dbsound_messages' || e.key === 'dbsound_fines') {
+      if (e.key === 'dbsound_policies' || e.key === 'dbsound_apartments' || e.key === 'dbsound_allocations' || e.key === 'dbsound_profiles' || e.key === 'dbsound_conversations' || e.key === 'dbsound_messages' || e.key === 'dbsound_fines') {
         loadAllData();
       }
     };
@@ -252,6 +257,7 @@ export const App: React.FC = () => {
       try {
         channel = supabase
           .channel('schema-db-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'noise_policies' }, () => { loadAllData(); })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'apartments' }, () => {
             loadAllData();
           })
@@ -284,7 +290,7 @@ export const App: React.FC = () => {
         supabase.removeChannel(channel);
       }
     };
-  }, []);
+  }, [user?.id, user?.condominium_id]);
 
   const pendingResidentsCount = profiles.filter(p => {
     const isExplicitAdmin = p.role === 'admin' && (p.email.toLowerCase().includes('admin') || p.email === 'admin@dbsound.com');
@@ -320,6 +326,8 @@ export const App: React.FC = () => {
   };
 
   return (
+    <>
+    {user?.role === 'admin' && <NoisePolicyAlarm apartments={apartments} policies={policies} />}
     <Routes>
       
       <Route
@@ -343,6 +351,7 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute requiredRole="admin">
             <SindicoLayout
+              policies={policies}
               alerts={alerts}
               occurrences={occurrences}
               pendingResidentsCount={pendingResidentsCount}
@@ -442,6 +451,7 @@ export const App: React.FC = () => {
           path="politicas"
           element={
             <PoliciesPage
+              loadError={policiesError}
               policies={policies}
               onRefresh={loadAllData}
             />
@@ -467,6 +477,7 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute requiredRole="resident">
             <ResidentMobileView
+              policies={policies}
               apartment={getResidentApartment()}
               alerts={alerts}
               occurrences={occurrences}
@@ -503,5 +514,6 @@ export const App: React.FC = () => {
       
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 };

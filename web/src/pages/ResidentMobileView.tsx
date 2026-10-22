@@ -1,3 +1,4 @@
+import { NoisePolicyAlarm } from '../components/NoisePolicyAlarm';
 import React, { useState, useEffect } from 'react';
 import { 
   Volume2, 
@@ -32,13 +33,14 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
-import { Apartment, Alert, Occurrence, SimulatedFine, OccurrenceStatus } from '../types/database.types';
+import { Apartment, Alert, Occurrence, SimulatedFine, OccurrenceStatus, NoisePolicy } from '../types/database.types';
 import { DataService, localStore } from '../lib/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { PrintableBoleto } from '../components/PrintableBoleto';
 
 interface ResidentMobileViewProps {
+  policies: NoisePolicy[];
   apartment?: Apartment | null;
   alerts: Alert[];
   occurrences: Occurrence[];
@@ -46,6 +48,7 @@ interface ResidentMobileViewProps {
 }
 
 export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
+  policies,
   apartment,
   alerts,
   occurrences,
@@ -55,8 +58,6 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'occurrences' | 'profile' | 'privacy'>('home');
   const [occSubTab, setOccSubTab] = useState<'new' | 'notices' | 'my_reports'>('new');
-  const [activeModalAlert, setActiveModalAlert] = useState<Alert | null>(null);
-  const [showInstructions, setShowInstructions] = useState<boolean>(false);
   const [isPhoneFrame, setIsPhoneFrame] = useState<boolean>(false);
 
   const [newType, setNewType] = useState('Música Alta / Som Excessivo');
@@ -121,29 +122,9 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
     return () => { unsubLocal(); };
   }, [effectiveApt.id, user?.id]);
 
-  useEffect(() => {
-    const unreadCritical = alerts.find(a => 
-      a.apartment_id === effectiveApt.id && 
-      a.severity === 'critical' && 
-      !a.read
-    );
-    if (unreadCritical && !activeModalAlert) {
-      setActiveModalAlert(unreadCritical);
-    }
-  }, [alerts, effectiveApt.id]);
-
   const currentDb = effectiveApt.current_db ?? 40.0;
   const status = effectiveApt.status || 'normal';
   const unitAlerts = alerts.filter(a => a.apartment_id === effectiveApt.id);
-
-  const handleDismissAlert = () => {
-    if (activeModalAlert) {
-      DataService.markAlertAsRead(activeModalAlert.id);
-    }
-    setActiveModalAlert(null);
-    setShowInstructions(false);
-    onRefresh();
-  };
 
   const handleCreateOccurrence = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -987,55 +968,7 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
           />
         )}
 
-        {/* Modal Crítico de Ruído Elevado */}
-        {activeModalAlert && (
-          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white border-2 border-rose-500 rounded-2xl p-6 text-center space-y-4 shadow-elevated max-w-xs w-full animate-fadeIn">
-              <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-
-              <div>
-                <h4 className="text-base font-bold text-rose-600 tracking-wider uppercase">Alerta de Ruído</h4>
-                <p className="text-xs font-semibold text-slate-800">Volume Elevado Detectado</p>
-              </div>
-
-              <div className="bg-rose-50 border border-rose-200 rounded-xl py-3">
-                <span className="text-3xl font-bold text-rose-700 font-mono">{currentDb.toFixed(1)} dB</span>
-              </div>
-
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Nível sonoro acima do limite configurado detectado no seu apartamento.
-              </p>
-
-              {showInstructions && (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-left text-[11px] text-slate-600 space-y-1">
-                  <span className="text-slate-900 font-bold block">Orientações de Boa Convivência:</span>
-                  <p>• Diminua o volume de televisores e instrumentos.</p>
-                  <p>• Feche portas e janelas para reduzir a reverberação.</p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <button
-                  onClick={handleDismissAlert}
-                  className="py-2.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-medium transition"
-                >
-                  Ignorar
-                </button>
-                <button
-                  onClick={() => {
-                    if (!showInstructions) setShowInstructions(true);
-                    else handleDismissAlert();
-                  }}
-                  className="py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition shadow-sm"
-                >
-                  {showInstructions ? 'Entendido' : 'Baixar som'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <NoisePolicyAlarm apartments={apartment ? [apartment] : []} policies={policies} />
 
       </div>
     </div>
