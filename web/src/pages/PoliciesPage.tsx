@@ -52,6 +52,10 @@ export const PoliciesPage: React.FC<{ policies: NoisePolicy[]; onRefresh: () => 
     {success && <p role="status" className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800">{success}</p>}
     <fieldset disabled={saving} className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {editable.map(p => <section key={p.id} className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <input type="checkbox" aria-label={`Ativar ${p.name}`} checked={p.enabled} onChange={e => change(p.id, 'enabled', e.target.checked)} className="accent-blue-600" />
+          {p.enabled ? 'Período ativo' : 'Período inativo (não participa dos alertas)'}
+        </label>
         <label className="block text-sm font-semibold text-slate-700">Nome do período<input aria-label={`Nome ${p.name}`} className={inputClass} value={p.name} onChange={e => change(p.id, 'name', e.target.value)} /></label>
         <div className="grid grid-cols-2 gap-4">
           <label className="text-sm text-slate-700">Início<input required aria-label={`Início ${p.name}`} type="time" className={inputClass} value={p.start_time.slice(0,5)} onChange={e => change(p.id,'start_time',e.target.value)} /></label>
