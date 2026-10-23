@@ -43,7 +43,7 @@ export function NoisePolicyAlarm({ apartments, policies }: { apartments: Apartme
   const elapsed = noiseElapsed(alarm.since, clockNow);
   const policy = activePolicy(policies);
   if (alarm.dismissed) return <aside aria-label="Tempo acima do limite" className="fixed bottom-24 left-4 right-4 z-40 mx-auto max-w-sm rounded-2xl border border-rose-300 bg-rose-50 p-4 shadow-lg text-rose-900">
-    <p className="text-sm font-semibold">Você está há {elapsed.text} acima do limite.</p>
+    <p className="text-sm font-semibold">Tempo acima do limite</p>
     <div className="flex items-center justify-between mt-2 gap-3">
       <span role="timer" aria-live="off" className="font-mono text-2xl tabular-nums">{elapsed.clock}</span>
       <button className="text-sm font-semibold underline" onClick={() => { const current = episodes.current.get(alarm.apartmentId); if (current) { current.dismissed = false; setAlarm({ ...current }); } }}>Ver alerta</button>
@@ -56,7 +56,7 @@ export function NoisePolicyAlarm({ apartments, policies }: { apartments: Apartme
       <p className="text-4xl font-bold text-rose-700">{alarm.db.toFixed(1)} dB</p>
       <p className="text-sm text-slate-600">Limite do período: {policy?.critical_threshold_db} dB · {policy?.name}</p>
       <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 space-y-2">
-        <p className="text-sm font-semibold text-rose-800">Você está há {elapsed.text} acima do limite.</p>
+        <p className="text-sm font-semibold text-rose-800">Tempo acima do limite</p>
         <p role="timer" aria-live="off" className="font-mono text-4xl font-bold tabular-nums text-rose-700">{elapsed.clock}</p>
       </div>
       <p className="text-xs text-slate-500">Ruído elevado confirmado em leituras sucessivas. Reduza o volume para preservar a convivência.</p>
