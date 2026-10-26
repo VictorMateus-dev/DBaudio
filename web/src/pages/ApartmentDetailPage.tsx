@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Apartment, Device, Sensor, Occurrence, Alert } from '../types/database.types';
 import { NoiseLevelBadge } from '../components/NoiseLevelBadge';
-import { NoiseChart } from '../components/NoiseChart';
+import { RecentNoiseChart } from '../components/RecentNoiseChart';
 import { 
   ArrowLeft, 
   Cpu, 
@@ -187,16 +187,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
       </div>
 
       {/* Noise Chart */}
-      <NoiseChart
-        data={[
-          { time: '17:00', decibel: Math.max(35, currentDb - 8) },
-          { time: '18:00', decibel: Math.max(35, currentDb - 4) },
-          { time: '19:00', decibel: Math.max(35, currentDb - 2) },
-          { time: '20:00', decibel: currentDb },
-          { time: '21:00', decibel: Math.max(35, currentDb - 5) },
-          { time: '22:00', decibel: currentDb },
-        ]}
-      />
+      <RecentNoiseChart apartmentId={apartment.id} />
 
       {/* Bottom Grid: Alerts & Occurrences */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

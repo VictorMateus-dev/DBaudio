@@ -1,0 +1,15 @@
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const ts = require('../web/node_modules/typescript');
+const code = ts.transpileModule(fs.readFileSync('web/src/lib/recentNoisePoints.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+const mod = { exports: {} }; new Function('exports', code)(mod.exports);
+const end = Date.parse('2026-10-26T15:00:00Z');
+const row = (offset, decibel) => ({ recorded_at: new Date(end + offset).toISOString(), decibel });
+const result = mod.exports.recentNoisePoints([row(-7200001, 99), row(-7200000, 50), row(-20000, 70), row(-10000, 90), row(1, 100), row(-5000, NaN)], end);
+assert.equal(result.count, 3);
+assert.equal(result.points.length, 121);
+assert.equal(result.points[0].decibel, 50);
+assert.equal(result.points[119].decibel, 90);
+assert.equal(result.points[60].decibel, null);
+assert.ok(mod.exports.recentNoisePoints([], end).points.every(p => p.decibel === null));
+console.log('PASS: two-hour boundaries, future/invalid exclusion, minute peaks and missing-data gaps');
