@@ -13,7 +13,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 interface ChartPoint {
   time: string;
-  decibel: number;
+  decibel: number | null;
 }
 
 interface NoiseChartProps {
@@ -31,18 +31,7 @@ export const NoiseChart: React.FC<NoiseChartProps> = ({
 }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const chartData = data.length > 0 ? data : [
-    { time: '14:00', decibel: 44 },
-    { time: '15:00', decibel: 48 },
-    { time: '16:00', decibel: 52 },
-    { time: '17:00', decibel: 49 },
-    { time: '18:00', decibel: 63 },
-    { time: '19:00', decibel: 58 },
-    { time: '20:00', decibel: 72 },
-    { time: '21:00', decibel: 55 },
-    { time: '22:00', decibel: 45 },
-    { time: '23:00', decibel: 42 },
-  ];
+  const chartData = data;
 
   return (
     <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-subtle">
@@ -51,10 +40,10 @@ export const NoiseChart: React.FC<NoiseChartProps> = ({
           <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <span>Curva de Intensidade Sonora</span>
             <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-mono font-medium">
-              dB SPL Ponderado A
+              dB SPL
             </span>
           </h3>
-          <p className="text-xs text-slate-500">Telemetria contínua com amostragens em tempo real</p>
+          <p className="text-xs text-slate-500">Leituras registradas • lacunas indicam ausência de dados</p>
         </div>
         <div className="flex items-center space-x-4 text-xs">
           <div className="flex items-center space-x-1.5">
@@ -87,7 +76,7 @@ export const NoiseChart: React.FC<NoiseChartProps> = ({
               axisLine={{ stroke: isDark ? "#1e293b" : "#e2e8f0" }} 
             />
             <YAxis 
-              domain={[30, 100]} 
+              domain={[(min: number) => Math.min(30, min), (max: number) => Math.max(100, max, criticalThreshold)]} 
               stroke={isDark ? "#64748b" : "#94a3b8"} 
               fontSize={11} 
               tickLine={false} 
@@ -119,7 +108,7 @@ export const NoiseChart: React.FC<NoiseChartProps> = ({
               strokeWidth={1.5}
             />
             <Area
-              type="monotone"
+              type="linear" connectNulls={false} isAnimationActive={false}
               dataKey="decibel"
               stroke="#2563eb"
               strokeWidth={2}
