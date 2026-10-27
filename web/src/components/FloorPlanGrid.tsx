@@ -130,7 +130,8 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
                         {isOffline ? (
                           <div className="flex items-center space-x-2 text-slate-400 py-2">
                             <WifiOff className="w-4 h-4" />
-                            <span className="text-xs font-medium">Dispositivo desconectado</span>
+                            <span className="text-xs font-medium">Offline — sem novas medições</span>
+                            <div className="h-2 w-16 rounded-full bg-slate-300" />
                           </div>
                         ) : (
                           <div>
@@ -179,7 +180,7 @@ export const FloorPlanGrid: React.FC<FloorPlanGridProps> = ({
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-[11px] pt-1">
-                          <span className="text-slate-400 text-[10px]">3 sensores calibrados</span>
+                          <span className="text-slate-400 text-[10px]">{isOffline ? 'Sem telemetria atual' : 'Telemetria recebida'}</span>
 
                           <span className="flex items-center text-blue-600 hover:text-blue-700 font-medium transition ml-auto">
                             Inspecionar <ChevronRight className="w-3.5 h-3.5 ml-0.5" />

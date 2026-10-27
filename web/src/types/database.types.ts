@@ -21,6 +21,8 @@ export interface Building {
 }
 
 export interface Apartment {
+  last_reading_at?: string;
+  telemetry_error?: boolean;
   id: string;
   building_id: string;
   number: string;
