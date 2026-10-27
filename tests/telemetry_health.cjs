@@ -1,0 +1,14 @@
+const fs=require('fs'),assert=require('node:assert/strict'),ts=require('../web/node_modules/typescript');
+const exports_={};new Function('exports',ts.transpileModule(fs.readFileSync('web/src/lib/telemetryHealth.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(exports_);
+const now=Date.parse('2026-10-27T15:00:00Z'), sample=age=>({recorded_at:new Date(now-age).toISOString(),decibel:68});
+const check=exports_.telemetrySnapshot;
+assert.equal(check([],now).offline,true);
+assert.equal(check([sample(99999)],now).offline,false);
+assert.equal(check([sample(100000)],now).offline,true);
+assert.equal(check([sample(100001),sample(1000)],now).offline,false);
+assert.equal(check([sample(100000)],now+10000).offline,true);
+assert.equal(check([sample(100000),sample(0)],now).offline,false);
+assert.equal(check([{recorded_at:'bad',decibel:70}],now).offline,true);
+assert.equal(check([sample(-60000)],now).offline,true);
+assert.equal(check([{...sample(0),decibel:NaN}],now).offline,true);
+console.log('PASS: no readings, exact ten missed transmissions, repeat polls, recovery, unsorted/invalid/future samples');

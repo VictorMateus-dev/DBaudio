@@ -26,6 +26,8 @@ export const ApartmentMap: React.FC<ApartmentMapProps> = ({
   return (
     <div className="space-y-6" aria-label="Planta e filtros das unidades">
       
+      {apartments.some(a => a.telemetry_error) && <p role="status" className="text-sm text-amber-700">Não foi possível verificar a telemetria. Verifique a conexão; uma falha de consulta não confirma falha do sensor.</p>}
+      {apartments.some(a => a.status === 'offline') && <p role="status" className="rounded-xl border border-slate-300 bg-slate-100 p-3 text-sm text-slate-600">Sem telemetria atual nas unidades: {apartments.filter(a => a.status === 'offline').map(a => a.number).join(', ')}. Reconexão automática ao receber novas leituras.</p>}
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

@@ -323,12 +323,13 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center space-x-1.5 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full text-xs text-emerald-700 font-semibold">
+          <div className={`flex items-center space-x-1.5 border px-3 py-1 rounded-full text-xs font-semibold ${status === 'offline' ? 'bg-slate-100 border-slate-300 text-slate-500' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>ESP32 Online</span>
+            <span>{status === 'offline' ? 'ESP32 Offline — sem medições' : 'ESP32 Online'}</span>
           </div>
         </div>
 
+        {status === 'offline' && <div role="status" className="m-3 p-3 rounded-xl border border-slate-300 bg-slate-100 text-sm text-slate-600">Sensor offline. Sem novas medições por dez envios esperados (100 segundos), ou sem leituras registradas. Aguardando reconexão.</div>}
         {/* Conteúdo das Abas */}
         <div className="flex-1 overflow-y-auto px-1 pb-16 space-y-4">
           
@@ -352,18 +353,18 @@ export const ResidentMobileView: React.FC<ResidentMobileViewProps> = ({
                   <span className={`text-4xl font-bold font-mono tracking-tight ${
                     status === 'critical' ? 'text-rose-600' : status === 'warning' ? 'text-amber-600' : 'text-slate-900'
                   }`}>
-                    {currentDb.toFixed(1)}
+                    {status === 'offline' ? '—' : currentDb.toFixed(1)}
                   </span>
                   <span className="text-xs text-slate-400 font-semibold mt-0.5">dB SPL</span>
                 </div>
 
                 <div className="mt-4">
                   <span className={`inline-block px-3.5 py-1 rounded-full text-xs font-semibold ${
-                    status === 'critical' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
+                    status === 'offline' ? 'bg-slate-200 text-slate-600 border border-slate-300' : status === 'critical' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
                     status === 'warning' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
                     'bg-emerald-100 text-emerald-800 border border-emerald-200'
                   }`}>
-                    {status === 'critical' ? 'Ruído Elevado' : status === 'warning' ? 'Atenção' : 'Nível Normal'}
+                    {status === 'offline' ? 'Offline — sem medições' : status === 'critical' ? 'Ruído Elevado' : status === 'warning' ? 'Atenção' : 'Nível Normal'}
                   </span>
                 </div>
               </div>

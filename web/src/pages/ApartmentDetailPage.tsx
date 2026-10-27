@@ -35,6 +35,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
 }) => {
   const [selectedSensorChannel, setSelectedSensorChannel] = useState<number>(1);
 
+  const isOffline = apartment.status === 'offline';
   const currentDb = apartment.current_db || 45.0;
   const sensorReadings: Record<number, number> = {
     1: currentDb,
@@ -73,6 +74,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
         </div>
       </div>
 
+      {isOffline && <div role="status" className="rounded-xl bg-slate-100 border border-slate-300 p-4 text-slate-600">Sensor offline: sem novas medições por dez envios esperados (100 segundos), ou sem leituras registradas. A conexão será reconhecida automaticamente quando chegar uma nova leitura.</div>}
       {/* Hero Unit Card */}
       <div className="bg-white border border-slate-200/80 rounded-xl p-6 shadow-subtle relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
@@ -92,7 +94,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
           <div className="flex items-center space-x-4 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
             <div className="text-center px-4">
               <span className="text-[11px] text-slate-500 block uppercase font-bold">Nível Atual</span>
-              <span className="text-2xl font-bold text-slate-900 font-mono">{currentDb.toFixed(1)} <span className="text-xs text-slate-500">dB</span></span>
+              <span className="text-2xl font-bold text-slate-900 font-mono">{isOffline ? '—' : currentDb.toFixed(1)} <span className="text-xs text-slate-500">dB</span></span>
             </div>
             <div className="w-px h-8 bg-slate-200"></div>
             <div className="text-center px-4">
@@ -137,7 +139,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
             </div>
             <div className="flex justify-between py-1">
               <span className="text-slate-500">Último Heartbeat</span>
-              <span className="text-slate-700">Há poucos segundos</span>
+              <span className="text-slate-700">{apartment.last_reading_at ? new Date(apartment.last_reading_at).toLocaleString('pt-BR') : 'Nenhuma leitura registrada'}</span>
             </div>
           </div>
         </div>
@@ -149,7 +151,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
               <Activity className="w-4 h-4 text-emerald-600" />
               <span>Canais dos Sensores MAX9814</span>
             </div>
-            <span className="text-xs text-slate-400 font-medium">3 canais calibrados</span>
+            <span className="text-xs text-slate-400 font-medium">{isOffline ? 'Sem medições atuais' : 'Canais dos sensores'}</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -165,19 +167,19 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
                   key={s.channel}
                   onClick={() => setSelectedSensorChannel(s.channel)}
                   className={`p-4 rounded-xl border transition cursor-pointer ${
-                    isSelected ? 'bg-blue-50/60 border-blue-400 shadow-subtle' : 'bg-slate-50/70 border-slate-200/80 hover:bg-slate-50'
+                    isOffline ? 'bg-slate-100 border-slate-300 text-slate-400' : isSelected ? 'bg-blue-50/60 border-blue-400 shadow-subtle' : 'bg-slate-50/70 border-slate-200/80 hover:bg-slate-50'
                   }`}
                 >
                   <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold block mb-1">
                     {s.pos}
                   </span>
                   <div className="flex items-baseline space-x-1 mb-2">
-                    <span className="text-2xl font-bold text-slate-900 font-mono">{val.toFixed(1)}</span>
+                    <span className="text-2xl font-bold text-slate-900 font-mono">{isOffline ? '—' : val.toFixed(1)}</span>
                     <span className="text-xs text-slate-500">dB</span>
                   </div>
-                  <div className="flex items-center space-x-1.5 text-[11px] text-emerald-700 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <span>Canal {s.channel} Ativo</span>
+                  <div className={`flex items-center space-x-1.5 text-[11px] font-medium ${isOffline ? 'text-slate-400' : 'text-emerald-700'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isOffline ? 'bg-slate-400' : 'bg-emerald-500'}`}></span>
+                    <span>Canal {s.channel} {isOffline ? 'Offline' : 'Ativo'}</span>
                   </div>
                 </div>
               );

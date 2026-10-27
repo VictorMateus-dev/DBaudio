@@ -1,3 +1,4 @@
+import { useTelemetryHealth } from './lib/useTelemetryHealth';
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams, Outlet } from 'react-router-dom';
 import { Menu } from 'lucide-react';
@@ -202,7 +203,8 @@ export const App: React.FC = () => {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [rawApartments, setApartments] = useState<Apartment[]>([]);
+  const apartments = useTelemetryHealth(rawApartments, user?.id || '');
   const [devices, setDevices] = useState<Device[]>([]);
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
