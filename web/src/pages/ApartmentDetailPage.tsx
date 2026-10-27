@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
+const NoiseAuditDialog = lazy(() => import('../components/NoiseAuditDialog').then(m => ({ default: m.NoiseAuditDialog })));
 import { Apartment, Device, Sensor, Occurrence, Alert } from '../types/database.types';
 import { NoiseLevelBadge } from '../components/NoiseLevelBadge';
 import { RecentNoiseChart } from '../components/RecentNoiseChart';
@@ -33,6 +34,7 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
   onBack,
   onOpenSimulator,
 }) => {
+  const [auditOpen, setAuditOpen] = useState(false);
   const [selectedSensorChannel, setSelectedSensorChannel] = useState<number>(1);
 
   const isOffline = apartment.status === 'offline';
@@ -188,6 +190,8 @@ export const ApartmentDetailPage: React.FC<ApartmentDetailPageProps> = ({
         </div>
       </div>
 
+      <div className="flex justify-end"><button onClick={() => setAuditOpen(true)} className="rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-semibold">Imprimir auditoria</button></div>
+      {auditOpen && <Suspense fallback={<p role="status">Abrindo auditoria…</p>}><NoiseAuditDialog apartmentId={apartment.id} onClose={() => setAuditOpen(false)} /></Suspense>}
       {/* Noise Chart */}
       <RecentNoiseChart apartmentId={apartment.id} />
 
